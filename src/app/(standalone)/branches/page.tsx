@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getDateRangeByPeriod, type Period } from "../../lib/date";
 import { Unbounded } from "next/font/google";
+import { useBranchesStore } from "../../lib/branchesStore";
 
 const unbounded = Unbounded({
   subsets: ["cyrillic"],
   weight: ["600", "700", "800", "900"],
 });
-
-type Period = "week" | "30" | "90" | "year";
 
 type BranchAnalyticsRow = {
   id: string;
@@ -42,7 +42,11 @@ function Badge({
 
   return (
     <span
-      className={`inline-flex min-w-[38px] justify-center rounded-[6px] px-2 py-1 text-[12px] ${cls}`}
+      className={[
+        "inline-flex shrink-0 items-center justify-center",
+        "h-6 w-[44px] rounded-[6px] px-2 text-[12px] leading-none",
+        cls,
+      ].join(" ")}
     >
       {value}
     </span>
@@ -60,53 +64,6 @@ function npsKind(n: number): "good" | "mid" | "bad" {
   if (n >= 20) return "mid";
   return "bad";
 }
-
-// -------------------- Date logic (сегодня + меняется только правая дата) --------------------
-const toMidnight = (d: Date) =>
-  new Date(d.getFullYear(), d.getMonth(), d.getDate());
-
-const formatDate = (date: Date) => {
-  const dd = String(date.getDate()).padStart(2, "0");
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const yyyy = date.getFullYear();
-  return `${dd}.${mm}.${yyyy}`;
-};
-
-const addDays = (d: Date, days: number) => {
-  const x = new Date(d);
-  x.setDate(x.getDate() + days);
-  return x;
-};
-
-const addYears = (d: Date, years: number) => {
-  const x = new Date(d);
-  x.setFullYear(x.getFullYear() + years);
-  return x;
-};
-
-const getDateRangeByPeriod = (p: Period) => {
-  const start = toMidnight(new Date()); // сегодня
-  let end: Date;
-
-  switch (p) {
-    case "week":
-      end = addDays(start, 6);
-      break;
-    case "30":
-      end = addDays(start, 29);
-      break;
-    case "90":
-      end = addDays(start, 89);
-      break;
-    case "year":
-      end = addDays(addYears(start, 1), -1);
-      break;
-    default:
-      end = start;
-  }
-
-  return { start, end, label: `${formatDate(start)} - ${formatDate(end)}` };
-};
 
 // -------------------- Mock (пока API нет) --------------------
 const MOCK_ROWS: BranchAnalyticsRow[] = [
@@ -178,6 +135,8 @@ async function fetchAnalytics(params: {
 
 export default function BranchesPage() {
   const router = useRouter();
+  const setBranches = useBranchesStore((s) => s.setBranches);
+  const selectBranchGlobal = useBranchesStore((s) => s.selectBranch);
 
   const [period, setPeriod] = useState<Period>("30");
   const [rangeLabel, setRangeLabel] = useState(
@@ -206,6 +165,8 @@ export default function BranchesPage() {
       const data = await fetchAnalytics({ period: p, start, end });
       setRows(data.rows);
       // если выбранного филиала больше нет в ответе — сбрасываем
+      setBranches(data.rows.map((x) => ({ id: x.id, name: x.name })));
+
       if (selectedId && !data.rows.some((x) => x.id === selectedId)) {
         setSelectedId(null);
       }
@@ -237,7 +198,7 @@ export default function BranchesPage() {
             {/* Logo */}
             <div className="flex items-start gap-1">
               <div
-                className={`${unbounded.className} text-[28px] font-[900] tracking-[-0.02em] text-[#111827]`}
+                className={`${unbounded.className} text-[28px] font-[600] tracking-[-0.02em] text-[#111827]`}
               >
                 Фидбэк
               </div>
@@ -257,7 +218,7 @@ export default function BranchesPage() {
             </button>
           </div>
 
-          <h1 className="mt-6 text-[24px] font-extrabold text-[#111827]">
+          <h1 className="mt-6 text-[24px] font-bold text-[#111827]">
             Аналитика по филиалам
           </h1>
 
@@ -313,7 +274,7 @@ export default function BranchesPage() {
             <input
               value={rangeLabel}
               readOnly
-              className="h-10 w-[230px] rounded-[12px] border border-[#E5E7EB] bg-white px-4 text-[13px] text-[#9CA3AF] outline-none"
+              className="h-10 w-[200px] rounded-[12px] border border-[#E5E7EB] bg-white px-4 text-[13px] text-[#9CA3AF] text-center outline-none"
             />
           </div>
         </div>
@@ -349,7 +310,10 @@ export default function BranchesPage() {
                       <button
                         key={r.id}
                         type="button"
-                        onClick={() => setSelectedId(r.id)}
+                        onClick={() => {
+                          setSelectedId(r.id);
+                          selectBranchGlobal(r.id);
+                        }}
                         className={`grid w-full grid-cols-[1.6fr_0.6fr_0.7fr_0.9fr_0.8fr_0.9fr] gap-4 py-4 text-left text-[14px] transition ${
                           selected ? "bg-[#F8FAFC]" : "hover:bg-[#FAFAFA]"
                         }`}
@@ -359,22 +323,23 @@ export default function BranchesPage() {
                             {r.name}
                           </span>
                         </div>
-                        <div className="text-center text-[#111827]">
+                        <div className="flex items-center justify-center text-[#111827]">
                           {r.requests}
                         </div>
-                        <div className="text-center text-[#111827]">
+                        <div className="flex items-center justify-center text-[#111827]">
                           {r.newReviews}
                         </div>
-                        <div className="text-center text-[#111827]">
+                        <div className="flex items-center justify-center text-[#111827]">
                           {r.interceptedComplaints}
                         </div>
-                        <div className="flex justify-center">
+                        <div className="flex items-center justify-center">
                           <Badge
                             value={r.avgRating.toFixed(1)}
                             kind={ratingKind(r.avgRating)}
                           />
                         </div>
-                        <div className="flex justify-center">
+
+                        <div className="flex items-center justify-center">
                           <Badge value={`${r.nps}%`} kind={npsKind(r.nps)} />
                         </div>
                       </button>
@@ -400,11 +365,11 @@ export default function BranchesPage() {
               disabled={!selectedBranch}
               onClick={() => {
                 if (!selectedBranch) return;
-                router.push(`/dashboard?branchId=${selectedBranch.id}`);
+                router.push(`/analytics?branchId=${selectedBranch.id}`);
               }}
               className={`h-10 rounded-[10px] px-4 text-[13px] font-semibold ${
                 selectedBranch
-                  ? "bg-[#F4C21A] text-[#111827] hover:brightness-95 active:brightness-90"
+                  ? "bg-yellow-400 text-[#111827] hover:bg-yellow-300 active:brightness-90"
                   : "bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed"
               }`}
             >
@@ -415,9 +380,9 @@ export default function BranchesPage() {
       </div>
 
       {/* FOOTER */}
-      <footer className="mt-auto pb-6">
+      <footer className="mt-auto pb-6 mb-[1px]">
         <div className="px-6">
-          <div className="flex items-center gap-6 text-[12px] leading-[16px]">
+          <div className="flex items-center gap-6 text-[12px] leading-[14px]">
             <span className="text-[#111827] text-[14px] font-semibold">
               Все права защищены © ООО «Фидбэк»
             </span>

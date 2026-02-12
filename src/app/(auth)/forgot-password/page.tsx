@@ -6,19 +6,19 @@ export default function ForgotPasswordPage() {
   return (
     <>
       {/* Карточка */}
-      <div className="rounded-[12px] border border-[#E5E7EB] bg-white px-6 py-6 shadow-[0_8px_24px_rgba(17,24,39,0.08)]">
+      <div className="auth-card">
         <form className="space-y-4">
           {/* Email */}
           <input
             type="email"
             placeholder="Email"
-            className="h-11 w-full rounded-[10px] border border-[#E5E7EB] bg-[#F3F4F6] px-4 text-[14px] text-[#111827] outline-none placeholder:text-[#9CA3AF] focus:bg-white"
+            className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-sm outline-none focus:bg-white"
           />
 
           {/* Кнопка */}
           <button
             type="submit"
-            className="h-11 w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] hover:brightness-95 active:brightness-90"
+            className="h-11 w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] hover:bg-yellow-300 active:brightness-90"
           >
             Восстановить пароль
           </button>
