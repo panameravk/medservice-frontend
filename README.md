@@ -103,37 +103,34 @@ settings
 
 ---
 
-# 🧠 Управление состоянием
+## 🧠 Управление состоянием
 
-Используется `Zustand` для:
+Используется **Zustand** для:
 
-- хранения списка филиалов
-- выбора активного филиала
-- синхронизации Header ↔ Analytics ↔ Branches
+- хранения списка филиалов  
+- выбора активного филиала  
+- синхронизации `Header ↔ Analytics ↔ Branches`
 
+```ts
 useBranchesStore()
-Архитектура готова к расширению (auth store, notifications store и др.).
+Архитектура готова к расширению
+(auth store, notifications store и др.)
 
-🔐 Готовность к backend
+🔌 Готовность к backend
 Frontend уже спроектирован под подключение API:
 
 lib/api.ts
-
 types/analytics.ts
+✔ моковые данные для временной работы
+✔ изолированная логика загрузки
+✔ легко заменить mock-запросы на реальные fetch
 
-моковые данные для временной работы
-
-изолированная логика загрузки
-
-Достаточно заменить mock-запросы на реальные fetch-запросы.
-
-📦 Структура проекта
-components/
-  ui/
-    Sidebar.tsx
-    Header.tsx
-    Footer.tsx
-    Brand.tsx
+📦 Ключевые директории проекта
+components/ui/
+  Sidebar.tsx
+  Header.tsx
+  Footer.tsx
+  Brand.tsx
 
 lib/
   api.ts
@@ -145,7 +142,6 @@ types/
 
 public/
   Icons/
-Структура модульная и масштабируемая.
 
 ## ▶ Запуск проекта локально
 
