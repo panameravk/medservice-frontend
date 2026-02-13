@@ -111,41 +111,34 @@ settings
 - выбора активного филиала  
 - синхронизации `Header ↔ Analytics ↔ Branches`
 
-```ts
-useBranchesStore()
-Архитектура готова к расширению
-(auth store, notifications store и др.)
+`useBranchesStore()`  
+Архитектура готова к расширению (auth store, notifications store и др.)
 
-🔌 Готовность к backend
+---
+
+## 🔌 Готовность к backend
+
 Frontend уже спроектирован под подключение API:
 
-Файлы:
+**Файлы:**
 
-lib/api.ts
+- `lib/api.ts`
+- `types/analytics.ts`
 
-types/analytics.ts
+✔ моковые данные для временной работы  
+✔ изолированная логика загрузки  
+✔ легко заменить mock-запросы на реальные `fetch`
 
-✔ моковые данные для временной работы
-✔ изолированная логика загрузки
-✔ легко заменить mock-запросы на реальные fetch
+---
 
-📦 Ключевые директории проекта
-components/ui/
-  Sidebar.tsx
-  Header.tsx
-  Footer.tsx
-  Brand.tsx
+## 📦 Ключевые директории проекта
 
-lib/
-  api.ts
-  branchesStore.ts
-  date.ts
+`components/ui/` — Sidebar, Header, Footer, Brand  
+`lib/` — api, branchesStore, date  
+`types/` — analytics  
+`public/Icons/` — SVG иконки  
 
-types/
-  analytics.ts
-
-public/
-  Icons/
+---
 ## ▶ Запуск проекта локально
 
 ```bash
