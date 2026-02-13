@@ -111,7 +111,6 @@ settings
 - выбора активного филиала
 - синхронизации Header ↔ Analytics ↔ Branches
 
-```ts
 useBranchesStore()
 Архитектура готова к расширению (auth store, notifications store и др.).
 
