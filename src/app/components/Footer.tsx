@@ -1,7 +1,7 @@
 export function Footer({ className = "" }: { className?: string }) {
   return (
     <footer className={`pb-6 ${className}`}>
-      <div className="px-auto">
+      <div className="px-7">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[12px] leading-[16px]">
           <span className="text-[#111827] text-[14px] font-semibold">
             Все права защищены © ООО «Фидбэк»

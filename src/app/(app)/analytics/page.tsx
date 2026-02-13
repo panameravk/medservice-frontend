@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { getAnalytics } from "../../lib/api";
 import type { AnalyticsData } from "../../types/analytics";
+import { getDateRangeByPeriod, type Period } from "../../lib/date";
 
 export default function AnalyticsPage() {
+  const [period, setPeriod] = useState<Period>("30");
+  const rangeLabel = useMemo(
+    () => getDateRangeByPeriod(period).label,
+    [period]
+  );
+
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
 
@@ -49,19 +56,116 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Title row */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#111827]">Аналитика</h1>
-          <div className="mt-1 text-sm text-gray-500">
-            {branchId ? `Филиал ID: ${branchId}` : "Филиал не выбран"}
-          </div>
-        </div>
+      {/* Header block */}
+      <div>
+        <h1 className="text-[24px] font-bold text-[#111827] leading-7">
+          Аналитика
+        </h1>
 
-        {/* Здесь позже будут фильтры: филиал/период */}
-        <div className="flex gap-3">
-          <div className="h-10 w-[280px] rounded-xl bg-white border border-black/5" />
-          <div className="h-10 w-[220px] rounded-xl bg-white border border-black/5" />
+        <p className="mt-1 text-[13px] text-[#6B7280]">
+          Динамика рейтинга и репутации
+        </p>
+
+        <div className="mt-4 flex items-center gap-6">
+          <div className="flex overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
+            <button
+              type="button"
+              className={`px-5 py-2.5 text-[13px] ${
+                period === "week"
+                  ? "bg-[#F3F4F6] text-[#111827]"
+                  : "text-[#9CA3AF]"
+              }`}
+              onClick={() => setPeriod("week")}
+            >
+              Неделя
+            </button>
+
+            <button
+              type="button"
+              className={`px-5 py-2.5 text-[13px] ${
+                period === "30"
+                  ? "bg-[#F3F4F6] text-[#111827]"
+                  : "text-[#9CA3AF]"
+              }`}
+              onClick={() => setPeriod("30")}
+            >
+              30 дней
+            </button>
+
+            <button
+              type="button"
+              className={`px-5 py-2.5 text-[13px] ${
+                period === "90"
+                  ? "bg-[#F3F4F6] text-[#111827]"
+                  : "text-[#9CA3AF]"
+              }`}
+              onClick={() => setPeriod("90")}
+            >
+              90 дней
+            </button>
+
+            <button
+              type="button"
+              className={`px-5 py-2.5 text-[13px] ${
+                period === "year"
+                  ? "bg-[#F3F4F6] text-[#111827]"
+                  : "text-[#9CA3AF]"
+              }`}
+              onClick={() => setPeriod("year")}
+            >
+              Год
+            </button>
+          </div>
+
+          <input
+            value={rangeLabel}
+            readOnly
+            className="h-10 w-[200px] rounded-[12px] border border-[#E5E7EB] bg-white px-4 text-[13px] text-[#9CA3AF] text-center outline-none"
+          />
+        </div>
+      </div>
+
+      <div className="rounded-[12px] border border-[#E5E7EB] bg-white px-6 py-4">
+        <div className="flex flex-wrap items-center gap-x-10 gap-y-4">
+          <div className="flex items-center gap-2">
+            <div className="text-[24px] font-bold leading-none text-[#111827]">
+              146
+            </div>
+            <div className="text-[12px] leading-[14px] text-[#000000]">
+              <div className="text-[#000000]">запросов</div>
+              <div>отправлено</div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="text-[24px] font-bold leading-none text-[#16A34A]">
+              76
+            </div>
+            <div className="text-[12px] leading-[14px] text-[#000000]">
+              <div className="text-[#000000]">новых</div>
+              <div>отзывов</div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="text-[24px] font-bold leading-none text-[#EF4444]">
+              5
+            </div>
+            <div className="text-[12px] leading-[14px] text-[#000000]">
+              <div className="text-[#000000]">перехвачено</div>
+              <div>жалоб</div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="text-[24px] font-bold leading-none text-[#111827]">
+              5.0
+            </div>
+            <div className="text-[12px] leading-[14px] text-[#000000]">
+              <div className="text-[#000000]">средняя оценка</div>
+              <div>новых отзывов</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -70,22 +174,6 @@ export default function AnalyticsPage() {
       )}
 
       {error && <div className="text-sm text-red-600">{error}</div>}
-
-      {/* KPI cards row */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SkeletonCard title="Отправлено" value={data?.sent} loading={loading} />
-        <SkeletonCard title="Отзывов" value={data?.reviews} loading={loading} />
-        <SkeletonCard
-          title="Перехвачено жалоб"
-          value={data?.complaints}
-          loading={loading}
-        />
-        <SkeletonCard
-          title="Средняя оценка"
-          value={data?.avgRating}
-          loading={loading}
-        />
-      </div>
 
       {/* Layout like screenshot: main + right panel */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px]">
