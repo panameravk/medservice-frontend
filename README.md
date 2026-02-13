@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏥 MedService Frontend
 
-## Getting Started
+<p align="center">
+  <b>Современная платформа аналитики отзывов и клиентской обратной связи</b><br/>
+  Next.js • TypeScript • Tailwind • Zustand
+</p>
 
-First, run the development server:
+---
+
+## ✨ О проекте
+
+**MedService Frontend** — это интерфейс аналитической системы для медицинских сетей,  
+которая помогает отслеживать отзывы пациентов, управлять запросами и повышать качество сервиса.
+
+Проект построен на **Next.js 14 (App Router)** с упором на:
+
+- чистую архитектуру  
+- масштабируемость  
+- современный UI  
+- удобную работу с данными филиалов  
+
+---
+
+## 🚀 Основные возможности
+
+### 📊 Аналитика филиалов
+- KPI-панель по отправленным запросам
+- Средняя оценка и рейтинг
+- Динамика NPS
+- Графики удовлетворённости
+- Детальная аналитика по площадкам
+
+---
+
+### 💬 Отзывы и запросы
+Раздел управления обратной связью:
+
+- ✅ Опубликованные отзывы  
+- 🚨 Перехваченные жалобы  
+- 📌 Статусы запросов  
+- 🔍 Фильтрация по платформам  
+- 📑 История взаимодействий  
+
+---
+
+### ⚙ Настройки системы
+Панель управления аккаунтом:
+
+- профиль пользователя  
+- параметры уведомлений  
+- системные настройки  
+- подготовка к интеграции с backend API  
+
+---
+
+## 🧩 Используемые технологии
+
+| Stack | Tools |
+|------|------|
+| Framework | **Next.js 14** |
+| Language | **TypeScript** |
+| UI | **React + Tailwind CSS** |
+| State Management | **Zustand** |
+| Routing | App Router |
+| Styling | Responsive UI + Pixel Perfect Layout |
+
+---
+
+## 📁 Структура проекта
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+src/app/(app)/
+ ├── analytics/                # Главная аналитика
+ ├── reviews-and-requests/     # Отзывы и запросы
+ │    ├── published-reviews/
+ │    ├── intercepted-complaints/
+ │    └── request-statuses/
+ ├── settings/                # Настройки
+ ├── layout.tsx               # Общий layout: Sidebar + Header + Footer
