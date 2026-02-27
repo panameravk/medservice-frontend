@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getDateRangeByPeriod, type Period } from "../../lib/date";
 import { Unbounded } from "next/font/google";
 import { useBranchesStore } from "../../lib/branchesStore";
+import { UserIcon } from "../../components/ui/icons/UserIcon";
 
 const unbounded = Unbounded({
   subsets: ["cyrillic"],
@@ -138,6 +139,10 @@ export default function BranchesPage() {
   const setBranches = useBranchesStore((s) => s.setBranches);
   const selectBranchGlobal = useBranchesStore((s) => s.selectBranch);
 
+  const [userOpen, setUserOpen] = useState(false);
+  const userBtnRef = useRef<HTMLButtonElement>(null);
+  const userPopRef = useRef<HTMLDivElement>(null);
+
   const [period, setPeriod] = useState<Period>("30");
   const [rangeLabel, setRangeLabel] = useState(
     () => getDateRangeByPeriod("30").label
@@ -179,6 +184,18 @@ export default function BranchesPage() {
   };
 
   useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const t = e.target as Node;
+      const inside =
+        userBtnRef.current?.contains(t) || userPopRef.current?.contains(t);
+      if (!inside) setUserOpen(false);
+    };
+
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
     load(period);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -209,13 +226,75 @@ export default function BranchesPage() {
               </div>
             </div>
 
-            {/* User */}
-            <button
-              type="button"
-              className="h-11 min-w-[220px] rounded-[10px] border border-[#E5E7EB] bg-[#2B2E39] px-5 text-[14px] font-medium text-white shadow-[0_6px_18px_rgba(17,24,39,0.08)]"
-            >
-              Сергей П.
-            </button>
+            {/* User button */}
+            <div className="relative">
+              <button
+                ref={userBtnRef}
+                type="button"
+                onClick={() => setUserOpen((v) => !v)}
+                className="h-12 w-[220px] rounded-[16px] border border-[#E5E7EB] bg-[#2B2E39] px-5 text-[14px] font-medium text-white shadow-[0_6px_18px_rgba(17,24,39,0.08)] cursor-pointer"
+              >
+                Сергей П.
+              </button>
+
+              {userOpen && (
+                <div
+                  ref={userPopRef}
+                  className="absolute right-0 top-[56px] w-[280px] rounded-[14px] bg-white border border-[#E5E7EB] shadow-[0_18px_40px_rgba(17,24,39,0.18)] p-4 z-30"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 flex justify-center">
+                        <UserIcon className="w-8 h-8 text-[#111827] ml-[9px]" />
+                      </div>
+
+                      <div>
+                        <div className="text-[14px] text-[#111827] leading-5">
+                          Сергей Popov
+                        </div>
+                        <div className="text-[12px] text-[#9CA3AF] leading-4">
+                          popov.s@yandex.ru
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setUserOpen(false)}
+                      className="h-8 w-8 rounded-full hover:bg-[#F3F4F6] flex items-center justify-center text-[#6B7280]"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="mt-4 w-full h-10 rounded-[10px]
+                  flex items-center gap-3 px-3
+                  text-[#000000] text-[14px] 
+                  hover:bg-[#F3F4F6] transition cursor-pointer"
+                  >
+                    <img
+                      src="/icons/setup-account_logo.svg"
+                      alt="setup-account_logo"
+                      className="w-8 h-8 text-[#111827]"
+                    />
+                    Настроить аккаунт
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserOpen(false);
+                      router.push("/login");
+                    }}
+                    className="mt-3 w-full h-10 rounded-[10px] bg-[#2B2E39] text-white text-[13px] font-semibold shadow-[0_10px_24px_rgba(17,24,39,0.14)] cursor-pointer hover:opacity-90 transition"
+                  >
+                    Выйти
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <h1 className="mt-6 text-[24px] font-bold text-[#111827]">

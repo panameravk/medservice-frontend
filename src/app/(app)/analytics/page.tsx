@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
-import { getAnalytics } from "../../lib/api";
+import { getAnalytics, getReviews, type Review } from "../../lib/api";
 import type { AnalyticsData } from "../../types/analytics";
+import { useBranchesStore } from "../../lib/branchesStore";
 import { getDateRangeByPeriod, type Period } from "../../lib/date";
 
 export default function AnalyticsPage() {
@@ -13,46 +13,72 @@ export default function AnalyticsPage() {
     [period]
   );
 
-  const searchParams = useSearchParams();
-  const branchId = searchParams.get("branchId");
+  // ← было: searchParams.get("branchId") — не работало со store
+  const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
 
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Последние отзывы для правой панели
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  // ── Аналитика (пересчитывается при смене филиала или периода) ─────────────
   useEffect(() => {
-    if (!branchId) {
+    if (!selectedBranchId) {
       setData(null);
-      setError(null);
-      setLoading(false);
       return;
     }
 
     let cancelled = false;
+    setLoading(true);
+    setError(null);
 
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const res = await getAnalytics(branchId);
+    getAnalytics(selectedBranchId, period) // ← period теперь передаётся
+      .then((res) => {
         if (!cancelled) setData(res);
-      } catch {
+      })
+      .catch(() => {
         if (!cancelled) {
           setError("Не удалось загрузить аналитику");
           setData(null);
         }
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) setLoading(false);
-      }
-    };
-
-    void load();
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [branchId]);
+  }, [selectedBranchId, period]); // ← period в зависимостях
+
+  // ── Последние отзывы для правой панели ───────────────────────────────────
+  useEffect(() => {
+    if (!selectedBranchId) {
+      setReviews([]);
+      return;
+    }
+
+    let cancelled = false;
+    setReviewsLoading(true);
+
+    getReviews({ branchId: selectedBranchId, limit: 5 })
+      .then((res) => {
+        if (!cancelled) setReviews(res.reviews);
+      })
+      .catch(() => {
+        if (!cancelled) setReviews([]);
+      })
+      .finally(() => {
+        if (!cancelled) setReviewsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBranchId]);
 
   return (
     <div className="space-y-6">
@@ -68,53 +94,20 @@ export default function AnalyticsPage() {
 
         <div className="mt-4 flex items-center gap-6">
           <div className="flex overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
-            <button
-              type="button"
-              className={`px-5 py-2.5 text-[13px] ${
-                period === "week"
-                  ? "bg-[#F3F4F6] text-[#111827]"
-                  : "text-[#9CA3AF]"
-              }`}
-              onClick={() => setPeriod("week")}
-            >
-              Неделя
-            </button>
-
-            <button
-              type="button"
-              className={`px-5 py-2.5 text-[13px] ${
-                period === "30"
-                  ? "bg-[#F3F4F6] text-[#111827]"
-                  : "text-[#9CA3AF]"
-              }`}
-              onClick={() => setPeriod("30")}
-            >
-              30 дней
-            </button>
-
-            <button
-              type="button"
-              className={`px-5 py-2.5 text-[13px] ${
-                period === "90"
-                  ? "bg-[#F3F4F6] text-[#111827]"
-                  : "text-[#9CA3AF]"
-              }`}
-              onClick={() => setPeriod("90")}
-            >
-              90 дней
-            </button>
-
-            <button
-              type="button"
-              className={`px-5 py-2.5 text-[13px] ${
-                period === "year"
-                  ? "bg-[#F3F4F6] text-[#111827]"
-                  : "text-[#9CA3AF]"
-              }`}
-              onClick={() => setPeriod("year")}
-            >
-              Год
-            </button>
+            {(["week", "30", "90", "year"] as Period[]).map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={`px-5 py-2.5 text-[13px] ${
+                  period === p
+                    ? "bg-[#F3F4F6] text-[#111827]"
+                    : "text-[#9CA3AF]"
+                }`}
+                onClick={() => setPeriod(p)}
+              >
+                {p === "week" ? "Неделя" : p === "year" ? "Год" : `${p} дней`}
+              </button>
+            ))}
           </div>
 
           <input
@@ -125,69 +118,63 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      {/* Stats row — ← было хардкодные числа, теперь из data */}
       <div className="rounded-[12px] border border-[#E5E7EB] bg-white px-6 py-4">
-        <div className="flex flex-wrap items-center gap-x-10 gap-y-4">
-          <div className="flex items-center gap-2">
-            <div className="text-[24px] font-bold leading-none text-[#111827]">
-              146
-            </div>
-            <div className="text-[12px] leading-[14px] text-[#000000]">
-              <div className="text-[#000000]">запросов</div>
-              <div>отправлено</div>
-            </div>
+        {loading ? (
+          <div className="flex flex-wrap gap-x-10 gap-y-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <div className="h-7 w-12 rounded bg-black/5" />
+                <div className="space-y-1">
+                  <div className="h-3 w-16 rounded bg-black/5" />
+                  <div className="h-3 w-12 rounded bg-black/5" />
+                </div>
+              </div>
+            ))}
           </div>
-
-          <div className="flex items-center gap-2">
-            <div className="text-[24px] font-bold leading-none text-[#16A34A]">
-              76
-            </div>
-            <div className="text-[12px] leading-[14px] text-[#000000]">
-              <div className="text-[#000000]">новых</div>
-              <div>отзывов</div>
-            </div>
+        ) : error ? (
+          <div className="text-sm text-red-600">{error}</div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-x-10 gap-y-4">
+            <StatCard
+              value={data?.sent}
+              label1="запросов"
+              label2="отправлено"
+              color="#111827"
+            />
+            <StatCard
+              value={data?.reviews}
+              label1="новых"
+              label2="отзывов"
+              color="#16A34A"
+            />
+            <StatCard
+              value={data?.complaints}
+              label1="перехвачено"
+              label2="жалоб"
+              color="#EF4444"
+            />
+            <StatCard
+              value={data?.avgRating}
+              label1="средняя оценка"
+              label2="новых отзывов"
+              color="#111827"
+            />
           </div>
-
-          <div className="flex items-center gap-2">
-            <div className="text-[24px] font-bold leading-none text-[#EF4444]">
-              5
-            </div>
-            <div className="text-[12px] leading-[14px] text-[#000000]">
-              <div className="text-[#000000]">перехвачено</div>
-              <div>жалоб</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="text-[24px] font-bold leading-none text-[#111827]">
-              5.0
-            </div>
-            <div className="text-[12px] leading-[14px] text-[#000000]">
-              <div className="text-[#000000]">средняя оценка</div>
-              <div>новых отзывов</div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
-      {loading && (
-        <div className="text-sm text-gray-500">Загрузка данных...</div>
-      )}
-
-      {error && <div className="text-sm text-red-600">{error}</div>}
-
-      {/* Layout like screenshot: main + right panel */}
+      {/* Layout: main + right panel */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px]">
         {/* Left: widgets */}
         <section className="space-y-6">
-          {/* Table */}
           <div className="rounded-2xl bg-white border border-black/5 p-4">
             <div className="mb-4 font-medium text-[#111827]">
-              Таблица (позже)
+              Площадка (позже)
             </div>
             <div className="h-[260px] rounded-xl bg-black/5" />
           </div>
 
-          {/* Charts row */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="rounded-2xl bg-white border border-black/5 p-4">
               <div className="mb-4 font-medium text-[#111827]">
@@ -204,16 +191,22 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          {/* Big chart */}
           <div className="rounded-2xl bg-white border border-black/5 p-4">
             <div className="mb-4 font-medium text-[#111827]">
-              Большой график (позже)
+              Оценка сотрудников (позже)
             </div>
-            <div className="h-[260px] rounded-xl bg-black/5" />
+            <div className="h-[300px] rounded-xl bg-black/5" />
+          </div>
+
+          <div className="rounded-2xl bg-white border border-black/5 p-4">
+            <div className="mb-4 font-medium text-[#111827]">
+              Динамика NPS большая (позже)
+            </div>
+            <div className="h-[450px] rounded-xl bg-black/5" />
           </div>
         </section>
 
-        {/* Right: reviews feed */}
+        {/* Right: reviews feed — ← было статичные скелетоны, теперь реальные отзывы */}
         <aside className="rounded-2xl bg-white border border-black/5 p-4">
           <div className="mb-4 flex items-center justify-between">
             <div className="font-medium text-[#111827]">Новые отзывы</div>
@@ -221,9 +214,36 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="space-y-4">
-            <ReviewSkeleton />
-            <ReviewSkeleton />
-            <ReviewSkeleton />
+            {reviewsLoading ? (
+              [...Array(3)].map((_, i) => <ReviewSkeleton key={i} />)
+            ) : reviews.length === 0 ? (
+              <p className="text-sm text-gray-400">
+                Нет отзывов за выбранный период
+              </p>
+            ) : (
+              reviews.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-xl border border-black/5 p-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-medium text-[#111827]">
+                      {r.authorName}
+                    </span>
+                    <span className="text-[12px] text-[#6B7280]">
+                      ★ {r.rating}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[12px] text-[#6B7280] line-clamp-2">
+                    {r.text}
+                  </p>
+                  <div className="mt-2 text-[11px] text-[#9CA3AF]">
+                    {r.platform} ·{" "}
+                    {new Date(r.publishedAt).toLocaleDateString("ru-RU")}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </aside>
       </div>
@@ -231,31 +251,28 @@ export default function AnalyticsPage() {
   );
 }
 
-function SkeletonCard({
-  title,
+// ─── Вспомогательные компоненты ───────────────────────────────────────────────
+
+function StatCard({
   value,
-  loading,
+  label1,
+  label2,
+  color,
 }: {
-  title: string;
-  value?: number;
-  loading?: boolean;
+  value?: number | null;
+  label1: string;
+  label2: string;
+  color: string;
 }) {
   return (
-    <div className="rounded-2xl bg-white border border-black/5 p-4">
-      <div className="text-sm text-gray-500">{title}</div>
-
-      {loading ? (
-        <>
-          <div className="mt-3 h-8 w-24 rounded bg-black/5" />
-          <div className="mt-2 h-4 w-32 rounded bg-black/5" />
-        </>
-      ) : value !== undefined ? (
-        <div className="mt-3 text-2xl font-semibold text-[#111827]">
-          {value}
-        </div>
-      ) : (
-        <div className="mt-3 text-sm text-gray-400">—</div>
-      )}
+    <div className="flex items-center gap-2">
+      <div className="text-[24px] font-bold leading-none" style={{ color }}>
+        {value ?? "—"}
+      </div>
+      <div className="text-[12px] leading-[14px] text-[#000000]">
+        <div>{label1}</div>
+        <div>{label2}</div>
+      </div>
     </div>
   );
 }

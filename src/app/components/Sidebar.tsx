@@ -4,6 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Unbounded } from "next/font/google";
 import Image from "next/image";
+import { useEffect, useState } from "react";
+import { useBranchesStore } from "../lib/branchesStore";
+import { getAnalytics } from "../lib/api";
 
 const unbounded = Unbounded({
   subsets: ["cyrillic"],
@@ -12,20 +15,32 @@ const unbounded = Unbounded({
 
 export function Sidebar() {
   const pathname = usePathname();
+  const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
+
+  // ── Счётчик отправленных запросов за текущий месяц ───────────────────────
+  const [sent, setSent] = useState<number | null>(null);
+  const MONTHLY_LIMIT = 150; // лимит можно будет получать из настроек
+
+  useEffect(() => {
+    if (!selectedBranchId) return;
+    getAnalytics(selectedBranchId, "30")
+      .then((data) => setSent(data.sent))
+      .catch(() => {});
+  }, [selectedBranchId]);
 
   const nav = [
     {
       href: "/analytics",
       label: "Аналитика",
-      icon: "/Icons/analytics_sidebar.svg",
+      icon: "/Icons/analytics_logo.svg",
     },
     {
       href: "/reviews-and-requests",
       label: "Отзывы и запросы",
-      icon: "/Icons/reviews-and-requests_sidebar.svg",
+      icon: "/Icons/heart_logo.svg",
     },
     {
-      href: "/settings",
+      href: "/settings/branch",
       label: "Настройки",
       icon: "/Icons/settings_sidebar.svg",
     },
@@ -88,9 +103,11 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* Footer info */}
+        {/* Footer info — ← было хардкод "0 из 150" */}
         <div className="mt-auto px-2 pt-6 text-[11px] leading-4 text-[#6B7280]">
-          Отправлено 0 запросов из 150 в этом месяце
+          {sent !== null
+            ? `Отправлено ${sent} запросов из ${MONTHLY_LIMIT} в этом месяце`
+            : "Загрузка..."}
         </div>
       </div>
     </aside>

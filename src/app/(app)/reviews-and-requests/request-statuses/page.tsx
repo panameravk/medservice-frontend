@@ -1,34 +1,116 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import {
+  getRequests,
+  type ReviewRequest,
+  type RequestStatus,
+} from "../../../lib/api";
+import { useBranchesStore } from "../../../lib/branchesStore";
+
+const STATUS_TABS: { label: string; value: RequestStatus | undefined }[] = [
+  { label: "Все запросы", value: undefined },
+  { label: "Отзыв опубликован", value: "published" },
+  { label: "Перешел на сайт отзывов", value: "visited" },
+  { label: "Поставил оценку", value: "rated" },
+  { label: "Открыл ссылку", value: "opened" },
+  { label: "Запрос отправлен", value: "sent" },
+  { label: "Жалоба", value: "complaint" },
+];
+
+// Цвет и иконка статуса — как в Figma
+const STATUS_STYLE: Record<string, { color: string; dot: string }> = {
+  published: { color: "#16A34A", dot: "bg-[#16A34A]" },
+  visited: { color: "#F59E0B", dot: "bg-[#F59E0B]" },
+  rated: { color: "#F59E0B", dot: "bg-[#F59E0B]" },
+  opened: { color: "#6B7280", dot: "bg-[#6B7280]" },
+  sent: { color: "#6B7280", dot: "bg-[#D1D5DB]" },
+  complaint: { color: "#DC2626", dot: "bg-[#DC2626]" },
+};
+
+const PLATFORMS: Record<string, string> = {
+  yandex_maps: "Яндекс.Карты",
+  google_maps: "Google Maps",
+  "2gis": "2Gis",
+  prodoctorov: "ПроДокторов",
+  napopravku: "НаПоправку",
+};
+
+function StatusDot({ status }: { status: RequestStatus | null }) {
+  if (!status) return <span className="text-[#9CA3AF]">—</span>;
+  const s = STATUS_STYLE[status] ?? { dot: "bg-[#D1D5DB]" };
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`h-3 w-3 rounded-full ${s.dot}`} />
+      <span style={{ color: s.color }} className="text-[12px]">
+        {status === "complaint" ? "Жалоба" : null}
+      </span>
+    </span>
+  );
+}
+
 export default function RequestStatusPage() {
+  const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
+
+  const [requests, setRequests] = useState<ReviewRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<RequestStatus | undefined>(
+    undefined
+  );
+
+  const isLoading = loading || !selectedBranchId;
+
+  useEffect(() => {
+    if (!selectedBranchId) return;
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    getRequests({ branchId: selectedBranchId, status: statusFilter })
+      .then((res) => {
+        if (!cancelled) setRequests(res.requests);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Не удалось загрузить запросы");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBranchId, statusFilter]);
+
   return (
     <div className="p-4">
-      {/* Top filter row */}
+      {/* Filter row */}
       <div className="flex flex-wrap items-center gap-3 border-b border-[#E5E7EB] pb-4">
         <div className="text-[12px] font-semibold text-[#111827]">
           Статус запроса
         </div>
-
-        {[
-          "Все запросы",
-          "Отзыв опубликован",
-          "Перешел на сайт отзывов",
-          "Поставил оценку",
-          "Открыл ссылку",
-          "Запрос отправлен",
-          "Жалоба",
-        ].map((s) => (
-          <span
-            key={s}
-            className="inline-flex items-center rounded-[6px] border border-[#E5E7EB] px-2 py-1 text-[12px] text-[#6B7280]"
+        {STATUS_TABS.map((tab) => (
+          <button
+            key={tab.label}
+            type="button"
+            onClick={() => setStatusFilter(tab.value)}
+            className={[
+              "inline-flex items-center rounded-[6px] border px-2 py-1 text-[12px] transition",
+              statusFilter === tab.value
+                ? "border-[#111827] bg-[#111827] text-white"
+                : "border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6]",
+            ].join(" ")}
           >
-            {s}
-          </span>
+            {tab.label}
+          </button>
         ))}
       </div>
 
       {/* Table */}
       <div className="mt-4 overflow-hidden rounded-[12px] border border-[#E5E7EB]">
+        {/* Header */}
         <div className="grid grid-cols-[140px_1.4fr_180px_160px_180px] gap-3 bg-[#F9FAFB] px-4 py-3 text-[12px] font-semibold text-[#111827]">
           <div>Статус</div>
           <div>Имя</div>
@@ -37,23 +119,62 @@ export default function RequestStatusPage() {
           <div>Читать отзыв</div>
         </div>
 
+        {/* Body */}
         <div className="divide-y divide-[#EEF2F7]">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div
-              key={i}
-              className="grid grid-cols-[140px_1.4fr_180px_160px_180px] gap-3 px-4 py-3 text-[13px] text-[#111827]"
-            >
-              <div className="text-[#6B7280]">—</div>
-              <div>Елена Александровна Пономарева</div>
-              <div className="text-[#6B7280]">+7 (963) 323-23-XX</div>
-              <div className="text-[#6B7280]">15.01.2026</div>
-              <div>
-                <span className="inline-flex items-center rounded-[6px] border border-[#E5E7EB] px-2 py-1 text-[12px] text-[#6B7280]">
-                  —
-                </span>
+          {isLoading ? (
+            Array.from({ length: 10 }).map((_, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-[140px_1.4fr_180px_160px_180px] gap-3 px-4 py-3"
+              >
+                <div className="h-3 w-8 rounded bg-black/5" />
+                <div className="h-3 w-48 rounded bg-black/5" />
+                <div className="h-3 w-28 rounded bg-black/5" />
+                <div className="h-3 w-20 rounded bg-black/5" />
+                <div className="h-3 w-16 rounded bg-black/5" />
               </div>
+            ))
+          ) : error ? (
+            <div className="px-4 py-6 text-sm text-red-500">{error}</div>
+          ) : requests.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-[#9CA3AF]">
+              Нет запросов по выбранному фильтру
             </div>
-          ))}
+          ) : (
+            requests.map((req) => (
+              <div
+                key={req.id}
+                className="grid grid-cols-[140px_1.4fr_180px_160px_180px] gap-3 px-4 py-3 text-[13px] text-[#111827]"
+              >
+                <div>
+                  <StatusDot status={req.status} />
+                </div>
+                <div>{req.patientName}</div>
+                <div className="text-[#6B7280]">{req.phone}</div>
+                <div className="text-[#6B7280]">
+                  {new Date(req.sentAt).toLocaleDateString("ru-RU", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })}
+                </div>
+                <div>
+                  {req.reviewId ? (
+                    <span className="inline-flex items-center rounded-[6px] border border-[#E5E7EB] px-2 py-1 text-[12px] text-[#6B7280] cursor-pointer hover:bg-[#F3F4F6]">
+                      {/* Платформу можно пробросить если бэкенд вернёт её в reviewId */}
+                      Читать
+                    </span>
+                  ) : req.complaintId ? (
+                    <span className="inline-flex items-center gap-1 rounded-[6px] border border-[#FEE2E2] bg-[#FEF2F2] px-2 py-1 text-[12px] text-[#DC2626]">
+                      Жалоба
+                    </span>
+                  ) : (
+                    <span className="text-[#9CA3AF]">—</span>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
