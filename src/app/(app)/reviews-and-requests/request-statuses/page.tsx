@@ -18,32 +18,31 @@ const STATUS_TABS: { label: string; value: RequestStatus | undefined }[] = [
   { label: "Жалоба", value: "complaint" },
 ];
 
-// Цвет и иконка статуса — как в Figma
-const STATUS_STYLE: Record<string, { color: string; dot: string }> = {
-  published: { color: "#16A34A", dot: "bg-[#16A34A]" },
-  visited: { color: "#F59E0B", dot: "bg-[#F59E0B]" },
-  rated: { color: "#F59E0B", dot: "bg-[#F59E0B]" },
-  opened: { color: "#6B7280", dot: "bg-[#6B7280]" },
-  sent: { color: "#6B7280", dot: "bg-[#D1D5DB]" },
-  complaint: { color: "#DC2626", dot: "bg-[#DC2626]" },
-};
-
-const PLATFORMS: Record<string, string> = {
-  yandex_maps: "Яндекс.Карты",
-  google_maps: "Google Maps",
-  "2gis": "2Gis",
-  prodoctorov: "ПроДокторов",
-  napopravku: "НаПоправку",
+const STATUS_STYLE: Record<
+  string,
+  { color: string; dot: string; label: string }
+> = {
+  published: { color: "#16A34A", dot: "bg-[#16A34A]", label: "Опубликован" },
+  visited: { color: "#F59E0B", dot: "bg-[#F59E0B]", label: "Посетил площадку" },
+  rated: { color: "#F59E0B", dot: "bg-[#F59E0B]", label: "Оценил" },
+  opened: { color: "#6B7280", dot: "bg-[#6B7280]", label: "Открыл" },
+  sent: { color: "#6B7280", dot: "bg-[#D1D5DB]", label: "Отправлен" },
+  complaint: { color: "#DC2626", dot: "bg-[#DC2626]", label: "Жалоба" },
 };
 
 function StatusDot({ status }: { status: RequestStatus | null }) {
   if (!status) return <span className="text-[#9CA3AF]">—</span>;
-  const s = STATUS_STYLE[status] ?? { dot: "bg-[#D1D5DB]" };
+  const s = STATUS_STYLE[status] ?? {
+    color: "#6B7280",
+    dot: "bg-[#D1D5DB]",
+    label: status,
+  };
+
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className={`h-3 w-3 rounded-full ${s.dot}`} />
       <span style={{ color: s.color }} className="text-[12px]">
-        {status === "complaint" ? "Жалоба" : null}
+        {s.label}
       </span>
     </span>
   );
@@ -86,11 +85,11 @@ export default function RequestStatusPage() {
 
   return (
     <div className="p-4">
-      {/* Filter row */}
       <div className="flex flex-wrap items-center gap-3 border-b border-[#E5E7EB] pb-4">
         <div className="text-[12px] font-semibold text-[#111827]">
           Статус запроса
         </div>
+
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.label}
@@ -108,26 +107,23 @@ export default function RequestStatusPage() {
         ))}
       </div>
 
-      {/* Table */}
       <div className="mt-4 overflow-hidden rounded-[12px] border border-[#E5E7EB]">
-        {/* Header */}
-        <div className="grid grid-cols-[140px_1.4fr_180px_160px_180px] gap-3 bg-[#F9FAFB] px-4 py-3 text-[12px] font-semibold text-[#111827]">
+        <div className="grid grid-cols-[180px_1.4fr_180px_160px_180px] gap-3 bg-[#F9FAFB] px-4 py-3 text-[12px] font-semibold text-[#111827]">
           <div>Статус</div>
           <div>Имя</div>
           <div>Телефон</div>
           <div>Дата запроса</div>
-          <div>Читать отзыв</div>
+          <div>Результат</div>
         </div>
 
-        {/* Body */}
         <div className="divide-y divide-[#EEF2F7]">
           {isLoading ? (
             Array.from({ length: 10 }).map((_, i) => (
               <div
                 key={i}
-                className="grid grid-cols-[140px_1.4fr_180px_160px_180px] gap-3 px-4 py-3"
+                className="grid grid-cols-[180px_1.4fr_180px_160px_180px] gap-3 px-4 py-3"
               >
-                <div className="h-3 w-8 rounded bg-black/5" />
+                <div className="h-3 w-20 rounded bg-black/5" />
                 <div className="h-3 w-48 rounded bg-black/5" />
                 <div className="h-3 w-28 rounded bg-black/5" />
                 <div className="h-3 w-20 rounded bg-black/5" />
@@ -144,13 +140,16 @@ export default function RequestStatusPage() {
             requests.map((req) => (
               <div
                 key={req.id}
-                className="grid grid-cols-[140px_1.4fr_180px_160px_180px] gap-3 px-4 py-3 text-[13px] text-[#111827]"
+                className="grid grid-cols-[180px_1.4fr_180px_160px_180px] gap-3 px-4 py-3 text-[13px] text-[#111827]"
               >
                 <div>
                   <StatusDot status={req.status} />
                 </div>
-                <div>{req.patientName}</div>
-                <div className="text-[#6B7280]">{req.phone}</div>
+
+                <div>{req.clientName}</div>
+
+                <div className="text-[#6B7280]">{req.clientPhone}</div>
+
                 <div className="text-[#6B7280]">
                   {new Date(req.sentAt).toLocaleDateString("ru-RU", {
                     day: "2-digit",
@@ -158,15 +157,15 @@ export default function RequestStatusPage() {
                     year: "numeric",
                   })}
                 </div>
+
                 <div>
-                  {req.reviewId ? (
-                    <span className="inline-flex items-center rounded-[6px] border border-[#E5E7EB] px-2 py-1 text-[12px] text-[#6B7280] cursor-pointer hover:bg-[#F3F4F6]">
-                      {/* Платформу можно пробросить если бэкенд вернёт её в reviewId */}
-                      Читать
-                    </span>
-                  ) : req.complaintId ? (
+                  {req.platform === "complaint" ? (
                     <span className="inline-flex items-center gap-1 rounded-[6px] border border-[#FEE2E2] bg-[#FEF2F2] px-2 py-1 text-[12px] text-[#DC2626]">
                       Жалоба
+                    </span>
+                  ) : req.rating !== null ? (
+                    <span className="inline-flex items-center rounded-[6px] border border-[#E5E7EB] px-2 py-1 text-[12px] text-[#6B7280]">
+                      {req.platform || "Площадка"} · ★ {req.rating}
                     </span>
                   ) : (
                     <span className="text-[#9CA3AF]">—</span>

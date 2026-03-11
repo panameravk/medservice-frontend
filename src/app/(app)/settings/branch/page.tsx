@@ -2,21 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useBranchesStore } from "../../../lib/branchesStore";
-
-const CITIES = [
-  "Санкт-Петербург",
-  "Москва",
-  "Екатеринбург",
-  "Новосибирск",
-  "Казань",
-];
+import { updateBranch } from "../../../lib/api";
 
 const TIMEZONES = [
-  { label: "Московское время - UTC +3", value: "Europe/Moscow" },
-  { label: "Калининград - UTC +2", value: "Europe/Kaliningrad" },
-  { label: "Самара - UTC +4", value: "Europe/Samara" },
-  { label: "Екатеринбург - UTC +5", value: "Asia/Yekaterinburg" },
-  { label: "Новосибирск - UTC +7", value: "Asia/Novosibirsk" },
+  { label: "Europe/Moscow", value: "Europe/Moscow" },
+  { label: "Europe/Kaliningrad", value: "Europe/Kaliningrad" },
+  { label: "Europe/Samara", value: "Europe/Samara" },
+  { label: "Asia/Yekaterinburg", value: "Asia/Yekaterinburg" },
+  { label: "Asia/Novosibirsk", value: "Asia/Novosibirsk" },
 ];
 
 const SPECIALTIES = [
@@ -35,32 +28,53 @@ export default function SettingsBranchPage() {
   const selectedBranch = useBranchesStore((s) =>
     s.branches.find((b) => b.id === s.selectedBranchId)
   );
+  const updateBranchInStore = useBranchesStore((s) => s.updateBranchInStore);
 
-  const [name, setName] = useState(selectedBranch?.name ?? "");
-  const [city, setCity] = useState(CITIES[0]);
-  const [timezone, setTimezone] = useState(TIMEZONES[0].value);
-  const [specialty, setSpecialty] = useState(SPECIALTIES[0]);
+  const [name, setName] = useState("");
+  const [city, setCity] = useState("");
+  const [timezone, setTimezone] = useState("Europe/Moscow");
+  const [specialty, setSpecialty] = useState("Офтальмология");
   const [cooldown, setCooldown] = useState(14);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Обновляем имя если сменился филиал
   useEffect(() => {
-    if (selectedBranch) setName(selectedBranch.name);
+    if (!selectedBranch) return;
+    setName(selectedBranch.name ?? "");
+    setCity(selectedBranch.city ?? "");
+    setTimezone(selectedBranch.timezone ?? "Europe/Moscow");
+    setSpecialty(selectedBranch.specialization ?? "Офтальмология");
+    setCooldown(selectedBranch.requestFrequencyDays ?? 14);
   }, [selectedBranch]);
 
   const handleSave = async () => {
+    if (!selectedBranch?.id) return;
+
     setSaving(true);
-    // TODO: подключить PATCH /api/v1/branches/{id} когда появится в бэкенде
-    await new Promise((r) => setTimeout(r, 400));
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+
+    try {
+      const updated = await updateBranch(selectedBranch.id, {
+        name,
+        city,
+        timezone,
+        specialization: specialty,
+        requestFrequencyDays: cooldown,
+      });
+
+      updateBranchInStore(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (!selectedBranch) {
+    return <p className="text-[#9CA3AF]">Выберите филиал</p>;
+  }
 
   return (
     <div className="max-w-[520px] space-y-6">
-      {/* Название филиала */}
       <div className="space-y-1.5">
         <label className="text-[13px] font-medium text-[#111827]">
           Название филиала
@@ -73,26 +87,16 @@ export default function SettingsBranchPage() {
         />
       </div>
 
-      {/* Город */}
       <div className="space-y-1.5">
         <label className="text-[13px] font-medium text-[#111827]">Город</label>
-        <div className="relative">
-          <select
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            className="h-11 w-full appearance-none rounded-[10px] border border-[#E5E7EB] bg-white px-4 text-[14px] text-[#111827] outline-none focus:border-[#111827] transition cursor-pointer"
-          >
-            {CITIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
-        </div>
+        <input
+          type="text"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          className="h-11 w-full rounded-[10px] border border-[#E5E7EB] bg-white px-4 text-[14px] text-[#111827] outline-none focus:border-[#111827] transition"
+        />
       </div>
 
-      {/* Часовой пояс */}
       <div className="space-y-1.5">
         <label className="text-[13px] font-medium text-[#111827]">
           Часовой пояс
@@ -113,7 +117,6 @@ export default function SettingsBranchPage() {
         </div>
       </div>
 
-      {/* Направление деятельности */}
       <div className="space-y-1.5">
         <label className="text-[13px] font-medium text-[#111827]">
           Направление деятельности
@@ -134,7 +137,6 @@ export default function SettingsBranchPage() {
         </div>
       </div>
 
-      {/* Cooldown */}
       <div className="space-y-2">
         <label className="text-[13px] font-medium text-[#111827]">
           Отправлять запрос на один номер не чаще (дней)
@@ -158,7 +160,6 @@ export default function SettingsBranchPage() {
         </div>
       </div>
 
-      {/* Save button */}
       <button
         type="button"
         onClick={handleSave}

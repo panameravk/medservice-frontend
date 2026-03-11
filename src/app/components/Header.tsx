@@ -3,7 +3,7 @@
 import { UserIcon } from "../components/ui/icons/UserIcon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBranchesStore } from "../lib/branchesStore";
-import { authApi } from "../lib/api";
+import { authApi, ApiError } from "../lib/api";
 import { useRouter } from "next/navigation";
 
 function ChevronDown({ className = "" }: { className?: string }) {
@@ -46,24 +46,24 @@ export function Header() {
   const branches = useBranchesStore((s) => s.branches);
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
   const selectBranch = useBranchesStore((s) => s.selectBranch);
+  const fetchBranches = useBranchesStore((s) => s.fetchBranches);
 
-  // ── 1. Загружаем филиалы один раз при монтировании ───────────────────────
   useEffect(() => {
-    useBranchesStore.getState().fetchBranches();
-  }, []); // Пустой массив = выполнится только один раз
+    void fetchBranches();
+  }, [fetchBranches]);
 
-  // ── 2. Загружаем имя текущего пользователя ───────────────────────────────
   const [userName, setUserName] = useState("...");
   const [userEmail, setUserEmail] = useState("");
+
   useEffect(() => {
     authApi
       .me()
       .then((u) => {
-        setUserName(u.username);
-        setUserEmail(u.username);
+        setUserName(u.fullName || u.username);
+        setUserEmail(u.email);
       })
-      .catch(() => {}); // если не авторизован — middleware перенаправит
-  }, []);
+      .catch(() => {});
+  }, [router]);
 
   const selectedBranch = useMemo(() => {
     if (!branches.length) return null;
@@ -81,17 +81,15 @@ export function Header() {
   useOutsideClick([branchBtnRef, branchPopRef], () => setBranchOpen(false));
   useOutsideClick([userBtnRef, userPopRef], () => setUserOpen(false));
 
-  // ── 3. Логаут ─────────────────────────────────────────────────────────────
   const handleLogout = () => {
     setUserOpen(false);
-    authApi.logout(); // очищает localStorage
+    authApi.logout();
     router.push("/login");
   };
 
   return (
     <div className="px-6 pt-4">
       <div className="flex items-center justify-between gap-6">
-        {/* Branch select */}
         <div className="relative w-full max-w-[720px]">
           <button
             ref={branchBtnRef}
@@ -150,7 +148,6 @@ export function Header() {
           )}
         </div>
 
-        {/* User button */}
         <div className="relative">
           <button
             ref={userBtnRef}
@@ -193,10 +190,7 @@ export function Header() {
 
               <button
                 type="button"
-                className="mt-4 w-full h-10 rounded-[10px]
-                  flex items-center gap-3 px-3
-                  text-[#000000] text-[14px] 
-                  hover:bg-[#F3F4F6] transition cursor-pointer"
+                className="mt-4 w-full h-10 rounded-[10px] flex items-center gap-3 px-3 text-[#000000] text-[14px] hover:bg-[#F3F4F6] transition cursor-pointer"
               >
                 <img
                   src="/icons/setup-account_logo.svg"

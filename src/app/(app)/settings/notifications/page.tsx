@@ -2,51 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { useBranchesStore } from "../../../lib/branchesStore";
+import { updateBranch } from "../../../lib/api";
 
-// Вспомогательная функция для уникальных email в нижнем регистре
 function uniqLower(arr: string[]): string[] {
-  return Array.from(new Set(arr.map((e) => e.trim().toLowerCase())));
+  return Array.from(
+    new Set(arr.map((e) => e.trim().toLowerCase()).filter(Boolean))
+  );
 }
 
 export default function NotificationsPage() {
-  const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
-  const localKey = `notifications_${selectedBranchId}`;
+  const selectedBranch = useBranchesStore((s) =>
+    s.branches.find((b) => b.id === s.selectedBranchId)
+  );
+  const updateBranchInStore = useBranchesStore((s) => s.updateBranchInStore);
 
   const [complaintEmails, setComplaintEmails] = useState<string[]>([]);
   const [reminderEmails, setReminderEmails] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // Загрузка данных из localStorage
   useEffect(() => {
-    if (!selectedBranchId) {
-      setLoading(false);
-      return;
-    }
+    setComplaintEmails(selectedBranch?.complaintEmails ?? []);
+    setReminderEmails(selectedBranch?.reminderEmails ?? []);
+  }, [selectedBranch]);
 
-    try {
-      const raw = localStorage.getItem(localKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as {
-          complaintEmails?: string[];
-          reminderEmails?: string[];
-        };
-        setComplaintEmails(uniqLower(parsed.complaintEmails ?? []));
-        setReminderEmails(uniqLower(parsed.reminderEmails ?? []));
-      } else {
-        // Данные по умолчанию
-        setComplaintEmails(["info@happylook.ru", "faq@happylook.ru"]);
-        setReminderEmails(["info@happylook.ru", "faq@happylook.ru"]);
-      }
-    } catch {
-      // игнорируем ошибки
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedBranchId, localKey]);
-
-  // Добавление email
   const addComplaintEmail = () => {
     const email = prompt("Введите email для жалоб:");
     if (email && email.includes("@")) {
@@ -65,7 +44,6 @@ export default function NotificationsPage() {
     }
   };
 
-  // Удаление email
   const removeComplaintEmail = (emailToRemove: string) => {
     setComplaintEmails((prev) => prev.filter((e) => e !== emailToRemove));
   };
@@ -74,26 +52,26 @@ export default function NotificationsPage() {
     setReminderEmails((prev) => prev.filter((e) => e !== emailToRemove));
   };
 
-  // Сохранение
-  const saveAll = () => {
-    if (!selectedBranchId) return;
+  const saveAll = async () => {
+    if (!selectedBranch?.id) return;
 
     setSaving(true);
 
-    const payload = {
-      complaintEmails: uniqLower(complaintEmails),
-      reminderEmails: uniqLower(reminderEmails),
-    };
+    try {
+      const updated = await updateBranch(selectedBranch.id, {
+        complaintEmails: uniqLower(complaintEmails),
+        reminderEmails: uniqLower(reminderEmails),
+      });
 
-    // Сохраняем в localStorage
-    localStorage.setItem(localKey, JSON.stringify(payload));
-
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 3000);
-    setSaving(false);
+      updateBranchInStore(updated);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  if (!selectedBranchId) {
+  if (!selectedBranch) {
     return (
       <div className="p-6">
         <p className="text-[#9CA3AF]">Выберите филиал</p>
@@ -106,7 +84,6 @@ export default function NotificationsPage() {
       <h1 className="text-2xl font-bold mb-6">Настройки уведомлений</h1>
 
       <div className="max-w-2xl space-y-8">
-        {/* Жалобы */}
         <div>
           <h2 className="text-lg font-semibold mb-3">
             Email для перехваченных жалоб
@@ -135,7 +112,6 @@ export default function NotificationsPage() {
           </button>
         </div>
 
-        {/* Напоминания */}
         <div>
           <h2 className="text-lg font-semibold mb-3">
             Email для напоминания об отправке запросов
@@ -164,13 +140,11 @@ export default function NotificationsPage() {
           </button>
         </div>
 
-        {/* Успех */}
         {success && <p className="text-green-500">Настройки сохранены</p>}
 
-        {/* Кнопка сохранения */}
         <button
           onClick={saveAll}
-          disabled={saving || loading}
+          disabled={saving}
           className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
         >
           {saving ? "Сохранение..." : "Сохранить"}

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { authApi } from "../../lib/api";
+import { useEffect, useState } from "react";
+import { authApi, getAccessToken } from "../../lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,11 +11,31 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const token = getAccessToken();
+
+    if (!token) {
+      setChecking(false);
+      return;
+    }
+
+    authApi
+      .me()
+      .then(() => {
+        router.replace("/branches");
+      })
+      .catch(() => {
+        setChecking(false);
+      });
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
+
     try {
       await authApi.login(username, password);
       router.push("/branches");
@@ -25,6 +45,12 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (checking) {
+    return (
+      <div className="text-sm text-[#6B7280]">Проверка авторизации...</div>
+    );
+  }
 
   return (
     <div className="auth-card">

@@ -43,12 +43,10 @@ export default function InterceptedComplaintsPage() {
       const updated = await resolveComplaint(id, resolved);
       setComplaints((prev) => prev.map((c) => (c.id === id ? updated : c)));
     } catch {
-      // тихо
+      // ignore
     }
   };
 
-  // Пока store ещё не загрузил филиалы — показываем скелетон,
-  // а не "Выберите филиал" (Header сам управляет выбором)
   const isLoading = loading || !selectedBranchId;
 
   return (
@@ -73,8 +71,9 @@ export default function InterceptedComplaintsPage() {
             <div key={c.id} className="py-4">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="text-[13px] font-semibold text-[#111827]">
-                  {c.authorName}
+                  {c.clientName || c.clientPhone || "Без имени"}
                 </span>
+
                 <span className="text-[12px] text-[#9CA3AF]">
                   {new Date(c.createdAt).toLocaleDateString("ru-RU", {
                     day: "2-digit",
@@ -82,6 +81,7 @@ export default function InterceptedComplaintsPage() {
                     year: "numeric",
                   })}
                 </span>
+
                 <span
                   className={[
                     "rounded-[4px] px-2 py-0.5 text-[11px]",

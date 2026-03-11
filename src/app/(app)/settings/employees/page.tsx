@@ -1,33 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Switch } from "../../../components/ui/Switch";
-
-type ProfileLink = { kind: "zoon" | "prodoctorov"; url: string };
-type Employee = {
-  id: number;
-  fullName: string;
-  requestsEnabled: boolean;
-  links: ProfileLink[];
-};
-
-const initialMock: Employee[] = [
-  {
-    id: 1,
-    fullName: "Байков Даниил Владимирович",
-    requestsEnabled: true,
-    links: [{ kind: "zoon", url: "https://zoon.ru/spb/" }],
-  },
-  {
-    id: 2,
-    fullName: "Михайлов Павел Павлович",
-    requestsEnabled: false,
-    links: [{ kind: "prodoctorov", url: "https://prodoctorov.ru/" }],
-  },
-];
+import { employeesApi, type Employee } from "../../../lib/api";
+import { useBranchesStore } from "../../../lib/branchesStore";
 
 export default function EmployeesPage() {
-  const [items, setItems] = useState<Employee[]>(initialMock);
+  const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
+
+  const [items, setItems] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
@@ -36,6 +18,16 @@ export default function EmployeesPage() {
     () => (editing ? "Редактировать сотрудника" : "Добавить сотрудника"),
     [editing]
   );
+
+  useEffect(() => {
+    if (!selectedBranchId) return;
+
+    setLoading(true);
+    employeesApi
+      .getAll(selectedBranchId)
+      .then(setItems)
+      .finally(() => setLoading(false));
+  }, [selectedBranchId]);
 
   const openCreate = () => {
     setEditing(null);
@@ -47,29 +39,58 @@ export default function EmployeesPage() {
     setIsOpen(true);
   };
 
-  const remove = (id: number) => setItems((p) => p.filter((x) => x.id !== id));
+  const remove = async (id: number) => {
+    await employeesApi.delete(id);
+    setItems((p) => p.filter((x) => x.id !== id));
+  };
 
-  const toggleRequests = (id: number) =>
-    setItems((p) =>
-      p.map((x) =>
-        x.id === id ? { ...x, requestsEnabled: !x.requestsEnabled } : x
-      )
-    );
+  const toggleRequests = async (id: number) => {
+    const current = items.find((x) => x.id === id);
+    if (!current) return;
 
-  const save = (payload: Omit<Employee, "id"> & { id?: number }) => {
-    setItems((p) => {
-      if (payload.id)
-        return p.map((x) => (x.id === payload.id ? (payload as Employee) : x));
-      const newId = Math.max(0, ...p.map((x) => x.id)) + 1;
-      return [{ ...(payload as Employee), id: newId }, ...p];
+    const updated = await employeesApi.update(id, {
+      active: !current.active,
     });
+
+    setItems((p) => p.map((x) => (x.id === id ? updated : x)));
+  };
+
+  const save = async (payload: {
+    id?: number;
+    name: string;
+    active: boolean;
+    profiles: string[];
+  }) => {
+    if (!selectedBranchId) return;
+
+    if (payload.id) {
+      const updated = await employeesApi.update(payload.id, {
+        name: payload.name,
+        active: payload.active,
+        profiles: payload.profiles,
+      });
+
+      setItems((p) => p.map((x) => (x.id === payload.id ? updated : x)));
+    } else {
+      const created = await employeesApi.create(selectedBranchId, {
+        name: payload.name,
+        active: payload.active,
+        profiles: payload.profiles,
+      });
+
+      setItems((p) => [created, ...p]);
+    }
+
     setIsOpen(false);
     setEditing(null);
   };
 
+  if (!selectedBranchId) {
+    return <p className="text-[#9CA3AF]">Выберите филиал</p>;
+  }
+
   return (
     <div className="space-y-4">
-      {/* Header row inside tab */}
       <div className="flex items-center justify-between gap-4">
         <div className="text-[14px] font-semibold text-[#111827]">
           Сотрудники
@@ -84,7 +105,6 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto rounded-[12px] border border-[#E5E7EB]">
         <table className="w-full border-collapse bg-white">
           <thead>
@@ -97,68 +117,85 @@ export default function EmployeesPage() {
           </thead>
 
           <tbody>
-            {items.map((e) => (
-              <tr key={e.id} className="border-t border-[#E5E7EB]">
-                <td className="py-3 px-4">
-                  <label className="inline-flex items-center gap-2">
-                    <Switch
-                      checked={e.requestsEnabled}
-                      onChange={() => toggleRequests(e.id)}
-                    />
-                  </label>
-                </td>
-
-                <td className="py-3 px-4 text-[14px] text-[#111827]">
-                  {e.fullName}
-                </td>
-
-                <td className="py-3 px-4">
-                  {e.links.length === 0 ? (
-                    <span className="text-[13px] text-[#9CA3AF]">—</span>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {e.links.map((l, idx) => (
-                        <a
-                          key={idx}
-                          href={l.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-1 rounded-full border border-[#E5E7EB] text-[12px] text-[#111827] hover:bg-[#F3F4F6]"
-                        >
-                          {l.kind}
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </td>
-
-                <td className="py-3 px-4">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(e)}
-                      className="h-9 w-9 rounded-[10px] border border-[#E5E7EB] hover:bg-[#F3F4F6]"
-                      title="Редактировать"
-                    >
-                      ✎
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => remove(e.id)}
-                      className="h-9 w-9 rounded-[10px] border border-[#E5E7EB] hover:bg-[#F3F4F6]"
-                      title="Удалить"
-                    >
-                      🗑
-                    </button>
-                  </div>
+            {loading ? (
+              <tr>
+                <td className="py-4 px-4 text-sm text-[#9CA3AF]" colSpan={4}>
+                  Загрузка...
                 </td>
               </tr>
-            ))}
+            ) : items.length === 0 ? (
+              <tr>
+                <td className="py-4 px-4 text-sm text-[#9CA3AF]" colSpan={4}>
+                  Сотрудников пока нет
+                </td>
+              </tr>
+            ) : (
+              items.map((e) => (
+                <tr key={e.id} className="border-t border-[#E5E7EB]">
+                  <td className="py-3 px-4">
+                    <label className="inline-flex items-center gap-2">
+                      <Switch
+                        checked={e.active}
+                        onChange={() => {
+                          void toggleRequests(e.id);
+                        }}
+                      />
+                    </label>
+                  </td>
+
+                  <td className="py-3 px-4 text-[14px] text-[#111827]">
+                    {e.name}
+                  </td>
+
+                  <td className="py-3 px-4">
+                    {e.profiles.length === 0 ? (
+                      <span className="text-[13px] text-[#9CA3AF]">—</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {e.profiles.map((url, idx) => (
+                          <a
+                            key={idx}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-3 py-1 rounded-full border border-[#E5E7EB] text-[12px] text-[#111827] hover:bg-[#F3F4F6]"
+                          >
+                            {url}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+
+                  <td className="py-3 px-4">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(e)}
+                        className="h-9 w-9 rounded-[10px] border border-[#E5E7EB] hover:bg-[#F3F4F6]"
+                        title="Редактировать"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void remove(e.id);
+                        }}
+                        className="h-9 w-9 rounded-[10px] border border-[#E5E7EB] hover:bg-[#F3F4F6]"
+                        title="Удалить"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* Modal */}
       {isOpen && (
         <EmployeeModal
           title={modalTitle}
@@ -183,27 +220,25 @@ function EmployeeModal({
   title: string;
   initial: Employee | null;
   onClose: () => void;
-  onSave: (payload: Omit<Employee, "id"> & { id?: number }) => void;
+  onSave: (payload: {
+    id?: number;
+    name: string;
+    active: boolean;
+    profiles: string[];
+  }) => void;
 }) {
-  const [fullName, setFullName] = useState(initial?.fullName ?? "");
-  const [zoon, setZoon] = useState(
-    initial?.links.find((x) => x.kind === "zoon")?.url ?? ""
-  );
-  const [prodoctorov, setProdoctorov] = useState(
-    initial?.links.find((x) => x.kind === "prodoctorov")?.url ?? ""
-  );
+  const [name, setName] = useState(initial?.name ?? "");
+  const [profile1, setProfile1] = useState(initial?.profiles[0] ?? "");
+  const [profile2, setProfile2] = useState(initial?.profiles[1] ?? "");
 
   const submit = () => {
-    const links: ProfileLink[] = [];
-    if (zoon.trim()) links.push({ kind: "zoon", url: zoon.trim() });
-    if (prodoctorov.trim())
-      links.push({ kind: "prodoctorov", url: prodoctorov.trim() });
+    const profiles = [profile1.trim(), profile2.trim()].filter(Boolean);
 
     onSave({
       id: initial?.id,
-      fullName: fullName.trim(),
-      requestsEnabled: initial?.requestsEnabled ?? true,
-      links,
+      name: name.trim(),
+      active: initial?.active ?? true,
+      profiles,
     });
   };
 
@@ -227,8 +262,8 @@ function EmployeeModal({
           <div>
             <div className="text-[12px] text-[#6B7280]">ФИО</div>
             <input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className="mt-1 h-10 w-full rounded-[10px] border border-[#E5E7EB] px-3 text-[14px] text-[#111827] outline-none focus:ring-2 focus:ring-black/10"
               placeholder="Введите ФИО"
             />
@@ -238,16 +273,16 @@ function EmployeeModal({
             <div className="text-[12px] text-[#6B7280]">Ссылки на профили</div>
             <div className="mt-1 space-y-2">
               <input
-                value={zoon}
-                onChange={(e) => setZoon(e.target.value)}
+                value={profile1}
+                onChange={(e) => setProfile1(e.target.value)}
                 className="h-10 w-full rounded-[10px] border border-[#E5E7EB] px-3 text-[14px] text-[#111827] outline-none focus:ring-2 focus:ring-black/10"
-                placeholder="Zoon URL"
+                placeholder="URL профиля 1"
               />
               <input
-                value={prodoctorov}
-                onChange={(e) => setProdoctorov(e.target.value)}
+                value={profile2}
+                onChange={(e) => setProfile2(e.target.value)}
                 className="h-10 w-full rounded-[10px] border border-[#E5E7EB] px-3 text-[14px] text-[#111827] outline-none focus:ring-2 focus:ring-black/10"
-                placeholder="ПроДокторов URL"
+                placeholder="URL профиля 2"
               />
             </div>
           </div>

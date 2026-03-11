@@ -1,11 +1,7 @@
-// lib/branchesStore.ts
 import { create } from "zustand";
-import { getBranches } from "./api";
+import { getBranches, type Branch } from "../lib/api";
 
-export type BranchOption = {
-  id: string;
-  name: string;
-};
+export type BranchOption = Branch;
 
 type BranchesState = {
   branches: BranchOption[];
@@ -13,8 +9,9 @@ type BranchesState = {
   loading: boolean;
   error: string | null;
 
-  fetchBranches: () => Promise<void>; // ← новый метод, вместо setBranches
-  setBranches: (branches: BranchOption[]) => void; // оставим для совместимости
+  fetchBranches: () => Promise<void>;
+  setBranches: (branches: BranchOption[]) => void;
+  updateBranchInStore: (branch: BranchOption) => void;
   selectBranch: (id: string | null) => void;
 };
 
@@ -24,29 +21,44 @@ export const useBranchesStore = create<BranchesState>((set, get) => ({
   loading: false,
   error: null,
 
-  // Загружает филиалы с бэкенда
   fetchBranches: async () => {
+    const { loading } = get();
+    if (loading) return;
+
     set({ loading: true, error: null });
+
     try {
-      const branches = await getBranches();
-      get().setBranches(branches);
+      const nextBranches = await getBranches();
+      get().setBranches(nextBranches);
     } catch (e: unknown) {
-      set({ error: (e as Error).message, loading: false });
+      set({ error: (e as Error).message || "Не удалось загрузить филиалы" });
     } finally {
       set({ loading: false });
     }
   },
 
-  // Оставили как было — на случай если где-то используется напрямую
   setBranches: (branches) =>
     set((s) => {
       const exists =
-        s.selectedBranchId && branches.some((b) => b.id === s.selectedBranchId);
+        s.selectedBranchId !== null &&
+        branches.some((b) => b.id === s.selectedBranchId);
+
+      const nextSelectedBranchId = exists
+        ? s.selectedBranchId
+        : branches[0]?.id ?? null;
+
       return {
         branches,
-        selectedBranchId: exists ? s.selectedBranchId : branches[0]?.id ?? null,
+        selectedBranchId: nextSelectedBranchId,
       };
     }),
+
+  updateBranchInStore: (branch) =>
+    set((s) => ({
+      branches: s.branches.map((b) =>
+        b.id === branch.id ? { ...b, ...branch } : b
+      ),
+    })),
 
   selectBranch: (id) => set({ selectedBranchId: id }),
 }));

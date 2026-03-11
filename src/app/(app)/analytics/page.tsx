@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAnalytics, getReviews, type Review } from "../../lib/api";
 import type { AnalyticsData } from "../../types/analytics";
 import { useBranchesStore } from "../../lib/branchesStore";
@@ -13,18 +13,15 @@ export default function AnalyticsPage() {
     [period]
   );
 
-  // ← было: searchParams.get("branchId") — не работало со store
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
 
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Последние отзывы для правой панели
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
 
-  // ── Аналитика (пересчитывается при смене филиала или периода) ─────────────
   useEffect(() => {
     if (!selectedBranchId) {
       setData(null);
@@ -35,7 +32,7 @@ export default function AnalyticsPage() {
     setLoading(true);
     setError(null);
 
-    getAnalytics(selectedBranchId, period) // ← period теперь передаётся
+    getAnalytics(selectedBranchId, period)
       .then((res) => {
         if (!cancelled) setData(res);
       })
@@ -52,9 +49,8 @@ export default function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedBranchId, period]); // ← period в зависимостях
+  }, [selectedBranchId, period]);
 
-  // ── Последние отзывы для правой панели ───────────────────────────────────
   useEffect(() => {
     if (!selectedBranchId) {
       setReviews([]);
@@ -64,7 +60,7 @@ export default function AnalyticsPage() {
     let cancelled = false;
     setReviewsLoading(true);
 
-    getReviews({ branchId: selectedBranchId, limit: 5 })
+    getReviews({ branchId: selectedBranchId, period, limit: 5 })
       .then((res) => {
         if (!cancelled) setReviews(res.reviews);
       })
@@ -78,11 +74,14 @@ export default function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedBranchId]);
+  }, [selectedBranchId, period]);
+
+  if (!selectedBranchId) {
+    return <p className="text-sm text-[#9CA3AF]">Сначала выберите филиал</p>;
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header block */}
       <div>
         <h1 className="text-[24px] font-bold text-[#111827] leading-7">
           Аналитика
@@ -118,7 +117,6 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Stats row — ← было хардкодные числа, теперь из data */}
       <div className="rounded-[12px] border border-[#E5E7EB] bg-white px-6 py-4">
         {loading ? (
           <div className="flex flex-wrap gap-x-10 gap-y-4">
@@ -164,9 +162,7 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      {/* Layout: main + right panel */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px]">
-        {/* Left: widgets */}
         <section className="space-y-6">
           <div className="rounded-2xl bg-white border border-black/5 p-4">
             <div className="mb-4 font-medium text-[#111827]">
@@ -206,7 +202,6 @@ export default function AnalyticsPage() {
           </div>
         </section>
 
-        {/* Right: reviews feed — ← было статичные скелетоны, теперь реальные отзывы */}
         <aside className="rounded-2xl bg-white border border-black/5 p-4">
           <div className="mb-4 flex items-center justify-between">
             <div className="font-medium text-[#111827]">Новые отзывы</div>
@@ -228,18 +223,24 @@ export default function AnalyticsPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[13px] font-medium text-[#111827]">
-                      {r.authorName}
+                      {r.reviewerName || "Аноним"}
                     </span>
                     <span className="text-[12px] text-[#6B7280]">
                       ★ {r.rating}
                     </span>
                   </div>
+
                   <p className="mt-1 text-[12px] text-[#6B7280] line-clamp-2">
-                    {r.text}
+                    {r.text || "Без текста"}
                   </p>
+
                   <div className="mt-2 text-[11px] text-[#9CA3AF]">
-                    {r.platform} ·{" "}
-                    {new Date(r.publishedAt).toLocaleDateString("ru-RU")}
+                    {r.platform}
+                    {r.publishedAt
+                      ? ` · ${new Date(r.publishedAt).toLocaleDateString(
+                          "ru-RU"
+                        )}`
+                      : ""}
                   </div>
                 </div>
               ))
@@ -250,8 +251,6 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-
-// ─── Вспомогательные компоненты ───────────────────────────────────────────────
 
 function StatCard({
   value,

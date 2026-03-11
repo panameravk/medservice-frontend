@@ -42,7 +42,6 @@ export default function PublishedReviewsPage() {
     setPlatformFilter((prev) => (prev === v ? null : v));
   }, []);
 
-  // Загрузка отзывов при изменении филиала или платформы
   useEffect(() => {
     if (!selectedBranchId) return;
 
@@ -76,7 +75,6 @@ export default function PublishedReviewsPage() {
     };
   }, [selectedBranchId, platformFilter]);
 
-  // Фильтрация по рейтингу
   const filteredReviews = useMemo(() => {
     if (ratingFilter.length === 0) return allReviews;
     return allReviews.filter((r) => ratingFilter.includes(r.rating));
@@ -92,7 +90,6 @@ export default function PublishedReviewsPage() {
 
   return (
     <div className="p-4">
-      {/* Filters */}
       <div className="flex flex-wrap items-center gap-4 border-b border-[#E5E7EB] pb-4">
         <div className="flex items-center gap-2">
           <div className="text-[12px] font-semibold text-[#111827]">Оценка</div>
@@ -137,7 +134,6 @@ export default function PublishedReviewsPage() {
         </div>
       </div>
 
-      {/* Content */}
       {loading ? (
         <div className="divide-y divide-[#EEF2F7]">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -164,26 +160,33 @@ export default function PublishedReviewsPage() {
             const platformLabel =
               PLATFORMS.find((p) => p.value === r.platform)?.label ??
               r.platform;
+
             return (
               <div key={r.id} className="py-4">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="text-[13px] font-semibold text-[#111827]">
-                    {r.authorName}
+                    {r.reviewerName || "Аноним"}
                   </span>
+
                   <span className="text-[12px] text-[#9CA3AF]">
-                    {new Date(r.publishedAt).toLocaleDateString("ru-RU", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })}
+                    {r.publishedAt
+                      ? new Date(r.publishedAt).toLocaleDateString("ru-RU", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })
+                      : "—"}
                   </span>
+
                   <span className="rounded-[4px] bg-[#F3F4F6] px-2 py-0.5 text-[11px] text-[#6B7280]">
                     {platformLabel}
                   </span>
+
                   <Stars rating={r.rating} />
                 </div>
+
                 <p className="mt-1.5 text-[13px] leading-[1.6] text-[#374151]">
-                  {r.text}
+                  {r.text || "Без текста"}
                 </p>
               </div>
             );
