@@ -1,36 +1,152 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🚀 MedService Frontend
 
-## Getting Started
+> Современная платформа аналитики отзывов и управления клиентской репутацией медицинских сетей.
 
-First, run the development server:
+<p align="center">
+  <b>Next.js 15 · TypeScript · Tailwind CSS · Zustand</b><br/>
+  Архитектура на App Router · Route Groups · Масштабируемый frontend
+</p>
+
+---
+
+## 💡 О проекте
+
+**MedService Frontend** — это B2B интерфейс аналитической системы для медицинских клиник и сетей.
+
+Платформа позволяет:
+
+- 📊 Анализировать отзывы пациентов
+- ⭐ Отслеживать рейтинг и среднюю оценку
+- 📈 Мониторить NPS и динамику удовлетворённости
+- 🚨 Контролировать негатив и жалобы
+- 📬 Управлять статусами запросов
+- 🏢 Работать с филиалами через единый интерфейс
+- 🧠 Подключать реальный backend API
+
+Проект построен с учётом масштабирования под production-нагрузку.
+
+---
+
+# ✨ Ключевые возможности
+
+## 📊 Аналитика
+
+- KPI-панель (запросы, отзывы, жалобы, рейтинг)
+- Динамика NPS
+- Графики удовлетворённости
+- Аналитика по филиалам
+- Глобальный выбор филиала через Zustand store
+- Поддержка фильтра по периоду (Неделя / 30 дней / 90 дней / Год)
+
+---
+
+## 💬 Отзывы и запросы
+
+Раздел включает:
+
+- Опубликованные отзывы
+- Перехваченные жалобы
+- Статусы запросов
+- Фильтрацию по платформам (Яндекс, Google, 2GIS и др.)
+- Управление статусами взаимодействия
+
+Архитектура подготовлена под подключение реального API.
+
+---
+
+## ⚙ Настройки
+
+- Управление профилем
+- Конфигурация уведомлений
+- Подготовка к ролям пользователей
+- Интеграции (CRM / SMS / Email)
+
+---
+
+# 🧱 Архитектура проекта
+
+Проект построен на **Next.js App Router** с использованием Route Groups.
+
+src/app/
+(auth)
+(standalone)/branches
+(app)/
+analytics
+reviews-and-requests
+settings
+
+
+### Используемые Layout'ы
+
+- `app/layout.tsx` — глобальная конфигурация
+- `src/app/(app)/layout.tsx` — основной layout с Sidebar + Header
+- `src/app/(auth)/layout.tsx` — layout без боковой панели
+
+Это позволяет:
+
+- Изолировать публичные страницы
+- Поддерживать единый интерфейс dashboard
+- Масштабировать приложение без хаоса
+
+---
+
+# 🛠 Технологический стек
+
+| Технология | Назначение |
+|------------|------------|
+| Next.js 15 | SSR + App Router |
+| TypeScript | Типизация и безопасность |
+| Tailwind CSS | UI-стилизация |
+| Zustand | Глобальное состояние (branchesStore) |
+| Next Image | Оптимизация изображений |
+| SVG Icons | Кастомные иконки sidebar |
+
+---
+
+## 🧠 Управление состоянием
+
+Используется **Zustand** для:
+
+- хранения списка филиалов  
+- выбора активного филиала  
+- синхронизации `Header ↔ Analytics ↔ Branches`
+
+`useBranchesStore()`  
+Архитектура готова к расширению (auth store, notifications store и др.)
+
+---
+
+## 🔌 Готовность к backend
+
+Frontend уже спроектирован под подключение API:
+
+**Файлы:**
+
+- `lib/api.ts`
+- `types/analytics.ts`
+
+✔ моковые данные для временной работы  
+✔ изолированная логика загрузки  
+✔ легко заменить mock-запросы на реальные `fetch`
+
+---
+
+## 📦 Ключевые директории проекта
+
+`components/ui/` — Sidebar, Header, Footer, Brand  
+`lib/` — api, branchesStore, date  
+`types/` — analytics  
+`public/Icons/` — SVG иконки  
+
+---
+## ▶ Запуск проекта локально
 
 ```bash
+# Установить зависимости
+npm install
+
+# Запустить dev-сервер
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Открыть в браузере
+http://localhost:3000
