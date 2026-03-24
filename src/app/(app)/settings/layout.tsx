@@ -8,6 +8,7 @@ const TABS = [
   { label: "Филиал", href: "/settings/branch" },
   { label: "Сотрудники", href: "/settings/employees" },
   { label: "Уведомления", href: "/settings/notifications" },
+  { label: "Доступы", href: "/settings/access" },
   { label: "Рассылки", href: "/settings/mailings" },
 ];
 
@@ -26,7 +27,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
 
       {/* Tabs */}
       <div className="overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
-        <div className="grid grid-cols-4 divide-x divide-[#E5E7EB] border-b border-[#E5E7EB]">
+        <div className="grid grid-cols-5 divide-x divide-[#E5E7EB] border-b border-[#E5E7EB]">
           {TABS.map((tab) => {
             const active = pathname === tab.href;
             return (
@@ -47,7 +48,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Tab content */}
-        <div className="p-6">{children}</div>
+        <div>{children}</div>
       </div>
     </div>
   );

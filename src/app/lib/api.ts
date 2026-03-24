@@ -11,11 +11,14 @@ export function getAccessToken(): string | null {
 export function setTokens(access: string) {
   if (typeof window === "undefined") return;
   localStorage.setItem("access_token", access);
+  document.cookie = `token=${access}; path=/; max-age=86400; samesite=lax`;
 }
 
 export function clearTokens() {
   if (typeof window === "undefined") return;
   localStorage.removeItem("access_token");
+  document.cookie =
+    "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax";
 }
 
 export class ApiError extends Error {

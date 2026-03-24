@@ -93,14 +93,14 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Center button */}
+        {/* ── Request reviews button → /mailings ── */}
         <div className="mt-6 flex justify-center">
-          <button
-            type="button"
-            className="h-10 w-[170px] rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] hover:bg-yellow-300 active:brightness-90"
+          <Link
+            href="/request-feedback"
+            className="flex items-center justify-center h-10 w-[170px] rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] hover:bg-yellow-300 active:brightness-90 transition-colors cursor-default"
           >
             Запросить отзывы
-          </button>
+          </Link>
         </div>
 
         {/* Footer info — ← было хардкод "0 из 150" */}
