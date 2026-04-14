@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { UserIcon } from "../components/ui/icons/UserIcon";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBranchesStore } from "../lib/branchesStore";
-import { authApi, ApiError } from "../lib/api";
+import { authApi } from "../lib/api";
 import { useRouter } from "next/navigation";
 
 function ChevronDown({ className = "" }: { className?: string }) {
@@ -31,22 +32,30 @@ function useOutsideClick(
   onOutside: () => void
 ) {
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      const inside = refs.some((r) => r.current && r.current.contains(target));
-      if (!inside) onOutside();
+    const handler = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const inside = refs.some(
+        (ref) => ref.current && ref.current.contains(target)
+      );
+
+      if (!inside) {
+        onOutside();
+      }
     };
+
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [refs, onOutside]);
+  }, [onOutside, refs]);
 }
 
 export function Header() {
   const router = useRouter();
+
   const branches = useBranchesStore((s) => s.branches);
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
   const selectBranch = useBranchesStore((s) => s.selectBranch);
   const fetchBranches = useBranchesStore((s) => s.fetchBranches);
+  const resetBranchesStore = useBranchesStore((s) => s.reset);
 
   useEffect(() => {
     void fetchBranches();
@@ -56,18 +65,33 @@ export function Header() {
   const [userEmail, setUserEmail] = useState("");
 
   useEffect(() => {
-    authApi
-      .me()
-      .then((u) => {
-        setUserName(u.fullName || u.username);
-        setUserEmail(u.email);
-      })
-      .catch(() => {});
-  }, [router]);
+    let cancelled = false;
+
+    const loadUser = async () => {
+      try {
+        const user = await authApi.me();
+
+        if (cancelled) return;
+
+        setUserName(user.fullName || user.username);
+        setUserEmail(user.email);
+      } catch {
+        if (cancelled) return;
+      }
+    };
+
+    void loadUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const selectedBranch = useMemo(() => {
     if (!branches.length) return null;
-    return branches.find((b) => b.id === selectedBranchId) ?? branches[0];
+    return (
+      branches.find((branch) => branch.id === selectedBranchId) ?? branches[0]
+    );
   }, [branches, selectedBranchId]);
 
   const [branchOpen, setBranchOpen] = useState(false);
@@ -78,82 +102,84 @@ export function Header() {
   const userBtnRef = useRef<HTMLButtonElement>(null);
   const userPopRef = useRef<HTMLDivElement>(null);
 
-  useOutsideClick([branchBtnRef, branchPopRef], () => setBranchOpen(false));
-  useOutsideClick([userBtnRef, userPopRef], () => setUserOpen(false));
+  const closeBranchMenu = useCallback(() => setBranchOpen(false), []);
+  const closeUserMenu = useCallback(() => setUserOpen(false), []);
+
+  useOutsideClick([branchBtnRef, branchPopRef], closeBranchMenu);
+  useOutsideClick([userBtnRef, userPopRef], closeUserMenu);
 
   const handleLogout = () => {
     setUserOpen(false);
     authApi.logout();
-    router.push("/login");
+    resetBranchesStore();
+    router.replace("/login");
   };
 
   return (
-    <div className="px-6 pt-4">
-      <div className="flex items-center justify-between gap-6">
-        <div className="relative w-full max-w-[720px]">
+    <div className="px-6 pt-5">
+      <div className="relative">
+        <div className="relative w-full min-w-0 pr-[0px]">
           <button
             ref={branchBtnRef}
             type="button"
-            onClick={() => setBranchOpen((v) => !v)}
+            onClick={() => setBranchOpen((open) => !open)}
             className={[
-              "w-full h-12",
-              "rounded-[12px] bg-white border border-[#E5E7EB]",
-              "px-4 flex items-center justify-between",
-              "text-[14px] text-[#111827]",
+              "flex h-15 w-full items-center justify-between px-4",
+              "rounded-[12px] border border-[#E5E7EB] bg-white",
+              "text-[15px] text-[#111827]",
               "shadow-[0_1px_0_rgba(0,0,0,0.02)]",
             ].join(" ")}
           >
-            <span className="truncate pr-3">
-              {selectedBranch?.name ?? "Выберите филиал"}
-            </span>
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate">
+                {selectedBranch?.name ?? "Выберите филиал"}
+              </span>
 
-            <ChevronDown
-              className={[
-                "shrink-0 text-[#6B7280] transition-transform",
-                branchOpen ? "rotate-180" : "",
-              ].join(" ")}
-            />
+              <ChevronDown
+                className={[
+                  "shrink-0 text-[#6B7280] transition-transform",
+                  branchOpen ? "rotate-180" : "",
+                ].join(" ")}
+              />
+            </div>
           </button>
 
           {branchOpen && branches.length > 0 && (
             <div
               ref={branchPopRef}
               className={[
-                "absolute left-0 top-[56px] w-[520px]",
-                "rounded-[12px] bg-white border border-[#E5E7EB]",
+                "absolute left-0 top-[64px] z-30 w-[520px]",
+                "rounded-[12px] border border-[#E5E7EB] bg-white p-2",
                 "shadow-[0_12px_30px_rgba(17,24,39,0.14)]",
-                "p-2",
-                "z-30",
               ].join(" ")}
             >
-              {branches.map((b) => (
+              {branches.map((branch) => (
                 <button
-                  key={b.id}
+                  key={branch.id}
                   type="button"
                   onClick={() => {
-                    selectBranch(b.id);
+                    selectBranch(branch.id);
                     setBranchOpen(false);
                   }}
                   className={[
-                    "w-full text-left",
-                    "px-3 py-2 rounded-[10px]",
+                    "w-full rounded-[10px] px-3 py-2 text-left",
                     "text-[14px] text-[#111827]",
                     "hover:bg-[#F3F4F6]",
                   ].join(" ")}
                 >
-                  {b.name}
+                  {branch.name}
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        <div className="relative">
+        <div className="absolute right-1.5 top-[6px] z-10">
           <button
             ref={userBtnRef}
             type="button"
-            onClick={() => setUserOpen((v) => !v)}
-            className="h-12 w-[220px] rounded-[16px] border border-[#E5E7EB] bg-[#2B2E39] px-5 text-[14px] font-medium text-white shadow-[0_6px_18px_rgba(17,24,39,0.08)] cursor-pointer"
+            onClick={() => setUserOpen((open) => !open)}
+            className="h-12 w-[220px] cursor-pointer rounded-[10px] border border-[#E5E7EB] bg-[#2B2E39] px-5 text-[14px] font-medium text-white shadow-[0_6px_18px_rgba(17,24,39,0.08)]"
           >
             {userName}
           </button>
@@ -161,19 +187,19 @@ export function Header() {
           {userOpen && (
             <div
               ref={userPopRef}
-              className="absolute right-0 top-[56px] w-[280px] rounded-[14px] bg-white border border-[#E5E7EB] shadow-[0_18px_40px_rgba(17,24,39,0.18)] p-4 z-30"
+              className="absolute right-0 top-[56px] z-30 w-[280px] rounded-[14px] border border-[#E5E7EB] bg-white p-4 shadow-[0_18px_40px_rgba(17,24,39,0.18)]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 flex justify-center">
-                    <UserIcon className="w-8 h-8 text-[#111827] ml-[9px]" />
+                  <div className="flex w-10 justify-center">
+                    <UserIcon className="ml-[9px] h-8 w-8 text-[#111827]" />
                   </div>
 
                   <div>
-                    <div className="text-[14px] text-[#111827] leading-5">
+                    <div className="text-[14px] leading-5 text-[#111827]">
                       {userName}
                     </div>
-                    <div className="text-[12px] text-[#9CA3AF] leading-4">
+                    <div className="text-[12px] leading-4 text-[#9CA3AF]">
                       {userEmail}
                     </div>
                   </div>
@@ -182,7 +208,7 @@ export function Header() {
                 <button
                   type="button"
                   onClick={() => setUserOpen(false)}
-                  className="h-8 w-8 rounded-full hover:bg-[#F3F4F6] flex items-center justify-center text-[#6B7280]"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[#6B7280] hover:bg-[#F3F4F6]"
                 >
                   ✕
                 </button>
@@ -190,12 +216,14 @@ export function Header() {
 
               <button
                 type="button"
-                className="mt-4 w-full h-10 rounded-[10px] flex items-center gap-3 px-3 text-[#000000] text-[14px] hover:bg-[#F3F4F6] transition cursor-pointer"
+                className="mt-4 flex h-10 w-full cursor-pointer items-center gap-3 rounded-[10px] px-3 text-[14px] text-[#000000] transition hover:bg-[#F3F4F6]"
               >
-                <img
+                <Image
                   src="/icons/setup-account_logo.svg"
-                  alt="setup-account_logo"
-                  className="w-8 h-8 text-[#111827]"
+                  alt="Настроить аккаунт"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8"
                 />
                 Настроить аккаунт
               </button>
@@ -203,7 +231,7 @@ export function Header() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="mt-3 w-full h-10 rounded-[10px] bg-[#2B2E39] text-white text-[13px] font-semibold shadow-[0_10px_24px_rgba(17,24,39,0.14)] cursor-pointer hover:opacity-90 transition"
+                className="mt-3 h-10 w-full cursor-pointer rounded-[10px] bg-[#2B2E39] text-[13px] font-semibold text-white shadow-[0_10px_24px_rgba(17,24,39,0.14)] transition hover:opacity-90"
               >
                 Выйти
               </button>

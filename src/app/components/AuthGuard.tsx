@@ -1,35 +1,52 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { getAccessToken, authApi } from "../lib/api";
+import { useRouter } from "next/navigation";
+import { authApi, getAccessToken } from "../lib/api";
+import { useBranchesStore } from "../lib/branchesStore";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const resetBranchesStore = useBranchesStore((s) => s.reset);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const token = getAccessToken();
+    let cancelled = false;
 
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
+    const verifyAuth = async () => {
+      const token = getAccessToken();
 
-    authApi
-      .me()
-      .then(() => {
-        setReady(true);
-      })
-      .catch(() => {
+      if (!token) {
+        authApi.logout();
+        resetBranchesStore();
         router.replace("/login");
-      });
-  }, [router, pathname]);
+        return;
+      }
+
+      try {
+        await authApi.me();
+
+        if (cancelled) return;
+        setReady(true);
+      } catch {
+        if (cancelled) return;
+
+        authApi.logout();
+        resetBranchesStore();
+        router.replace("/login");
+      }
+    };
+
+    void verifyAuth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resetBranchesStore, router]);
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-sm text-[#6B7280]">
+      <div className="flex min-h-screen items-center justify-center text-sm text-[#6B7280]">
         Загрузка...
       </div>
     );

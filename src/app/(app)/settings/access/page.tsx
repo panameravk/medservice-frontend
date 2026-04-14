@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface TeamMember {
   id: string;
@@ -10,23 +10,13 @@ interface TeamMember {
   phone: string;
 }
 
-const ROLES = ["Руководитель", "Специалист", "Гость"];
-
+const ROLES = ["Руководитель", "Специалист", "Гость"] as const;
 const STORAGE_KEY = "team_members";
 
-function loadMembers(): TeamMember[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : DEFAULT_MEMBERS;
-  } catch {
-    return DEFAULT_MEMBERS;
-  }
-}
-
-function saveMembers(members: TeamMember[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
-}
+type SelectOption = {
+  label: string;
+  value: string;
+};
 
 const DEFAULT_MEMBERS: TeamMember[] = [
   {
@@ -51,6 +41,108 @@ const DEFAULT_MEMBERS: TeamMember[] = [
     phone: "+7 999 333 22 11",
   },
 ];
+
+function loadMembers(): TeamMember[] {
+  if (typeof window === "undefined") return DEFAULT_MEMBERS;
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as TeamMember[]) : DEFAULT_MEMBERS;
+  } catch {
+    return DEFAULT_MEMBERS;
+  }
+}
+
+function saveMembers(members: TeamMember[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
+}
+
+function ChevronDown({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+    >
+      <path
+        d="M6 9l6 6 6-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CustomSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const selected = options.find((item) => item.value === value) ?? options[0];
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className={[
+          "flex h-11 w-full items-center justify-between rounded-[10px]",
+          "border border-transparent bg-[#F3F4F6] px-4 text-left text-[13px] text-[#111827]",
+          "outline-none transition-colors hover:bg-[#ECEEF1]",
+          open ? "border-[#D8D8D8]" : "focus:border-[#D8D8D8]",
+        ].join(" ")}
+      >
+        <span className="truncate">{selected?.label ?? "Выберите"}</span>
+        <ChevronDown
+          className={[
+            "shrink-0 text-[#6B7280] transition-transform duration-200",
+            open ? "rotate-180" : "",
+          ].join(" ")}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-[46px] z-50 w-full overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white p-1.5 shadow-[0_16px_36px_rgba(17,24,39,0.16)]">
+          <div className="max-h-[240px] overflow-y-auto">
+            {options.map((option) => {
+              const active = option.value === value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                  className={[
+                    "flex min-h-[40px] w-full items-center rounded-[10px] px-3 text-left text-[14px] transition",
+                    active
+                      ? "bg-[#F3F4F6] font-medium text-[#222222]"
+                      : "text-[#444444] hover:bg-[#F8F8F8]",
+                  ].join(" ")}
+                >
+                  <span className="pr-2">{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function IconEdit() {
   return (
@@ -89,7 +181,6 @@ function IconTrash() {
   );
 }
 
-// ── Modal ─────────────────────────────────────────────────────────────────────
 function MemberModal({
   initial,
   onClose,
@@ -97,84 +188,59 @@ function MemberModal({
 }: {
   initial: TeamMember | null;
   onClose: () => void;
-  onSave: (m: Omit<TeamMember, "id"> & { id?: string }) => void;
+  onSave: (member: Omit<TeamMember, "id"> & { id?: string }) => void;
 }) {
   const [fullName, setFullName] = useState(initial?.fullName ?? "");
   const [role, setRole] = useState(initial?.role ?? ROLES[0]);
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
 
+  const roleOptions: SelectOption[] = ROLES.map((r) => ({ label: r, value: r }));
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-[420px] bg-white rounded-[16px] shadow-[0_18px_40px_rgba(17,24,39,0.18)] p-6 space-y-4">
+      <div className="w-full max-w-[420px] rounded-[16px] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)] space-y-4">
         <div>
-          <label className="block text-[13px] font-medium text-[#111827] mb-1.5">
+          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
             ФИО
           </label>
           <input
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="w-full h-11 bg-[#F3F4F6] border border-transparent rounded-[10px] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] focus:outline-none focus:border-[#F4C21A] transition-colors"
+            className="w-full h-11 rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
             placeholder="Иванов Иван Иванович"
           />
         </div>
 
         <div>
-          <label className="block text-[13px] font-medium text-[#111827] mb-1.5">
+          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
             Роль в команде
           </label>
-          <div className="relative">
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="w-full h-11 bg-[#F3F4F6] border border-transparent rounded-[10px] px-4 text-[13px] text-[#111827] appearance-none focus:outline-none focus:border-[#F4C21A] transition-colors cursor-pointer"
-            >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-            <svg
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280]"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-            >
-              <path
-                d="M6 9l6 6 6-6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+          <CustomSelect value={role} options={roleOptions} onChange={setRole} />
         </div>
 
         <div>
-          <label className="block text-[13px] font-medium text-[#111827] mb-1.5">
+          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
             Email
           </label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full h-11 bg-[#F3F4F6] border border-transparent rounded-[10px] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] focus:outline-none focus:border-[#F4C21A] transition-colors"
+            className="w-full h-11 rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
             placeholder="email@example.com"
           />
         </div>
 
         <div>
-          <label className="block text-[13px] font-medium text-[#111827] mb-1.5">
+          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
             Телефон
           </label>
           <input
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="w-full h-11 bg-[#F3F4F6] border border-transparent rounded-[10px] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] focus:outline-none focus:border-[#F4C21A] transition-colors"
+            className="w-full h-11 rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
             placeholder="+7 999 000 00 00"
           />
         </div>
@@ -182,10 +248,16 @@ function MemberModal({
         <button
           type="button"
           onClick={() =>
-            onSave({ id: initial?.id, fullName, role, email, phone })
+            onSave({
+              id: initial?.id,
+              fullName: fullName.trim(),
+              role,
+              email: email.trim(),
+              phone: phone.trim(),
+            })
           }
           disabled={!fullName.trim()}
-          className="w-full h-11 rounded-[10px] bg-[#F4C21A] hover:bg-yellow-300 active:brightness-90 disabled:opacity-50 text-[13px] font-semibold text-[#111827] transition-colors"
+          className="h-11 w-full rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90 disabled:opacity-50"
         >
           {initial ? "Сохранить" : "Выдать доступ"}
         </button>
@@ -193,7 +265,7 @@ function MemberModal({
         <button
           type="button"
           onClick={onClose}
-          className="w-full text-center text-[13px] text-[#6B7280] hover:text-[#111827] transition-colors"
+          className="w-full text-center text-[13px] text-[#6B7280] transition-colors hover:text-[#111827]"
         >
           Отмена
         </button>
@@ -202,16 +274,10 @@ function MemberModal({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function AccessPage() {
-  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>(() => loadMembers());
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
-
-  useEffect(() => {
-    setMembers(loadMembers());
-  }, []);
 
   const persist = (next: TeamMember[]) => {
     setMembers(next);
@@ -221,36 +287,36 @@ export default function AccessPage() {
   const handleSave = (data: Omit<TeamMember, "id"> & { id?: string }) => {
     if (data.id) {
       persist(
-        members.map((m) =>
-          m.id === data.id ? ({ ...m, ...data } as TeamMember) : m
+        members.map((member) =>
+          member.id === data.id ? { ...member, ...data } : member
         )
       );
     } else {
       persist([...members, { ...data, id: String(Date.now()) } as TeamMember]);
     }
+
     setModalOpen(false);
     setEditing(null);
   };
 
   const handleDelete = (id: string) => {
-    persist(members.filter((m) => m.id !== id));
+    persist(members.filter((member) => member.id !== id));
   };
 
-  const openEdit = (m: TeamMember) => {
-    setEditing(m);
+  const openEdit = (member: TeamMember) => {
+    setEditing(member);
     setModalOpen(true);
   };
+
   const openCreate = () => {
     setEditing(null);
     setModalOpen(true);
   };
 
   return (
-    <div className="p-6 space-y-5">
-      {/* Table */}
+    <div className="space-y-5 p-6">
       <div className="overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
-        {/* Header */}
-        <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr_64px] px-6 py-3 text-[13px] font-medium text-[#6B7280] border-b border-[#E5E7EB]">
+        <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr_64px] border-b border-[#E5E7EB] px-6 py-3 text-[13px] font-medium text-[#6B7280]">
           <span>ФИО</span>
           <span>Роль в команде</span>
           <span>Email</span>
@@ -264,26 +330,36 @@ export default function AccessPage() {
           </div>
         ) : (
           <div className="divide-y divide-[#F3F4F6]">
-            {members.map((m) => (
+            {members.map((member) => (
               <div
-                key={m.id}
-                className="grid grid-cols-[1.6fr_1fr_1fr_1fr_64px] px-6 py-4 items-center hover:bg-[#FAFAFA] transition-colors"
+                key={member.id}
+                className="grid grid-cols-[1.6fr_1fr_1fr_1fr_64px] items-center px-6 py-4 transition-colors hover:bg-[#FAFAFA]"
               >
-                <span className="text-[13px] text-[#111827]">{m.fullName}</span>
-                <span className="text-[13px] text-[#6B7280]">{m.role}</span>
-                <span className="text-[13px] text-[#6B7280]">{m.email}</span>
-                <span className="text-[13px] text-[#6B7280]">{m.phone}</span>
-                <div className="flex items-center gap-3 justify-end">
+                <span className="text-[13px] text-[#111827]">
+                  {member.fullName}
+                </span>
+                <span className="text-[13px] text-[#6B7280]">
+                  {member.role}
+                </span>
+                <span className="text-[13px] text-[#6B7280]">
+                  {member.email}
+                </span>
+                <span className="text-[13px] text-[#6B7280]">
+                  {member.phone}
+                </span>
+                <div className="flex items-center justify-end gap-3">
                   <button
-                    onClick={() => openEdit(m)}
-                    className="text-[#9CA3AF] hover:text-[#111827] transition-colors"
+                    type="button"
+                    onClick={() => openEdit(member)}
+                    className="text-[#9CA3AF] transition-colors hover:text-[#111827]"
                     title="Редактировать"
                   >
                     <IconEdit />
                   </button>
                   <button
-                    onClick={() => handleDelete(m.id)}
-                    className="text-[#9CA3AF] hover:text-red-500 transition-colors"
+                    type="button"
+                    onClick={() => handleDelete(member.id)}
+                    className="text-[#9CA3AF] transition-colors hover:text-red-500"
                     title="Удалить"
                   >
                     <IconTrash />
@@ -298,7 +374,7 @@ export default function AccessPage() {
       <button
         type="button"
         onClick={openCreate}
-        className="h-12 px-8 rounded-[10px] bg-[#F4C21A] hover:bg-yellow-300 active:brightness-90 text-[13px] font-semibold text-[#111827] transition-colors"
+        className="h-12 rounded-[10px] bg-[#F4C21A] px-8 text-[13px] font-medium text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90"
       >
         Выдать доступ к филиалу
       </button>

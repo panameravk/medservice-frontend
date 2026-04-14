@@ -9,6 +9,7 @@ import { useBranchesStore } from "../../lib/branchesStore";
 import { UserIcon } from "../../components/ui/icons/UserIcon";
 import {
   authApi,
+  getBranches,
   getBranchesAnalytics,
   type BranchAnalyticsRow,
 } from "../../lib/api";
@@ -57,10 +58,9 @@ function npsKind(n: number): "good" | "mid" | "bad" {
   return "bad";
 }
 
-// Skeleton row for loading state — same height as real row
 function SkeletonRow() {
   return (
-    <div className="grid grid-cols-[1.6fr_0.6fr_0.7fr_0.9fr_0.8fr_0.9fr] gap-4 py-4 px-0">
+    <div className="grid grid-cols-[1.6fr_0.6fr_0.7fr_0.9fr_0.8fr_0.9fr] gap-4 px-0 py-4">
       <div className="h-4 w-48 rounded bg-black/5" />
       <div className="mx-auto h-4 w-8 rounded bg-black/5" />
       <div className="mx-auto h-4 w-8 rounded bg-black/5" />
@@ -71,99 +71,239 @@ function SkeletonRow() {
   );
 }
 
+function CalendarIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+    >
+      <path
+        d="M7 3v3M17 3v3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M4 8h16"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <rect
+        x="5"
+        y="5"
+        width="14"
+        height="16"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function DateField({
+  value,
+  onChange,
+  formatRu,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  formatRu: (iso: string) => string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const openPicker = () => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const pickerInput = input as HTMLInputElement & {
+      showPicker?: () => void;
+    };
+
+    if (typeof pickerInput.showPicker === "function") {
+      pickerInput.showPicker();
+    } else {
+      input.focus();
+      input.click();
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={openPicker}
+      className="relative flex h-10 w-[170px] items-center justify-between gap-2 rounded-[12px] border border-[#E5E7EB] bg-white px-4 text-[13px] text-[#111827] shadow-[0_1px_0_rgba(0,0,0,0.02)]"
+    >
+      <span className="tabular-nums">{formatRu(value)}</span>
+      <CalendarIcon className="text-[#9CA3AF]" />
+      <input
+        ref={inputRef}
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        className="absolute inset-0 h-full w-full opacity-0"
+      />
+    </button>
+  );
+}
+
 export default function BranchesPage() {
   const router = useRouter();
+
   const setBranches = useBranchesStore((s) => s.setBranches);
+  const resetBranchesStore = useBranchesStore((s) => s.reset);
+  const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
   const selectBranchGlobal = useBranchesStore((s) => s.selectBranch);
 
   const [userOpen, setUserOpen] = useState(false);
   const userBtnRef = useRef<HTMLButtonElement>(null);
   const userPopRef = useRef<HTMLDivElement>(null);
 
-  const [period, setPeriod] = useState<Period>("30");
-  const [rangeLabel, setRangeLabel] = useState(
-    () => getDateRangeByPeriod("30").label
-  );
+  const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+
+  const [activePreset, setActivePreset] = useState<Period>("30");
+
+  const initialRange = getDateRangeByPeriod("30");
+  const [dateFrom, setDateFrom] = useState(() => toISODate(initialRange.start));
+  const [dateTo, setDateTo] = useState(() => toISODate(initialRange.end));
+
+  const formatRu = (iso: string) => {
+    if (!iso) return "—";
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return iso;
+    return `${d}.${m}.${y}`;
+  };
 
   const [rows, setRows] = useState<BranchAnalyticsRow[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedName, setSelectedName] = useState<string | null>(null);
   const [userName, setUserName] = useState("...");
   const [userEmail, setUserEmail] = useState("");
 
   const selectedBranch = useMemo(
-    () => rows.find((r) => String(r.id) === selectedId) ?? null,
-    [rows, selectedId]
+    () => rows.find((row) => String(row.id) === selectedBranchId) ?? null,
+    [rows, selectedBranchId]
   );
 
-  // Keep last known name so footer doesn't flicker during reload
-  const displayName = selectedBranch?.name ?? selectedName;
+  useEffect(() => {
+    let cancelled = false;
 
-  const load = async (p: Period) => {
-    const { label } = getDateRangeByPeriod(p);
-    setLoading(true);
-    setError(null);
-    setRangeLabel(label);
+    const loadUser = async () => {
+      try {
+        const user = await authApi.me();
 
-    try {
-      const data = await getBranchesAnalytics(p);
-      setRows(data);
-      setBranches(data.map((x) => ({ id: String(x.id), name: x.name })));
-      if (selectedId && !data.some((x) => String(x.id) === selectedId)) {
-        setSelectedId(null);
+        if (cancelled) return;
+
+        setUserName(user.fullName || user.username);
+        setUserEmail(user.email);
+      } catch {
+        if (cancelled) return;
+
+        authApi.logout();
+        resetBranchesStore();
+        router.replace("/login");
       }
-    } catch {
-      setError("Не удалось загрузить аналитику. Попробуйте позже.");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    authApi
-      .me()
-      .then((u) => {
-        setUserName(u.fullName || u.username);
-        setUserEmail(u.email);
-      })
-      .catch(() => {
-        router.push("/login");
-      });
-  }, [router]);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const t = e.target as Node;
-      const inside =
-        userBtnRef.current?.contains(t) || userPopRef.current?.contains(t);
-      if (!inside) setUserOpen(false);
     };
+
+    void loadUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resetBranchesStore, router]);
+
+  useEffect(() => {
+    const handler = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const inside =
+        userBtnRef.current?.contains(target) ||
+        userPopRef.current?.contains(target);
+
+      if (!inside) {
+        setUserOpen(false);
+      }
+    };
+
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   useEffect(() => {
-    void load(period);
-  }, []);
+    let cancelled = false;
 
-  const setPeriodAndReload = (p: Period) => {
-    setPeriod(p);
-    void load(p);
-  };
+    const loadPageData = async () => {
+      try {
+        setError(null);
+        setLoading(true);
 
-  // Number of skeleton rows = last known rows count (or 5 on first load)
+        if (dateFrom && dateTo && dateFrom > dateTo) {
+          setError("Дата начала не может быть позже даты окончания");
+          setRows([]);
+          return;
+        }
+
+        const analyticsParams =
+          activePreset !== null
+            ? { period: activePreset }
+            : { start: dateFrom, end: dateTo };
+
+        const [analyticsRows, branches] = await Promise.all([
+          getBranchesAnalytics(analyticsParams),
+          getBranches(),
+        ]);
+
+        if (cancelled) return;
+
+        setRows(analyticsRows);
+        setBranches(branches);
+      } catch {
+        if (cancelled) return;
+
+        setRows([]);
+        setError(
+          "Не удалось загрузить аналитику по филиалам. Попробуйте позже."
+        );
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setInitialLoading(false);
+        }
+      }
+    };
+
+    void loadPageData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePreset, dateFrom, dateTo, setBranches]);
+
+  useEffect(() => {
+    if (rows.length === 0) return;
+
+    const hasSelected =
+      selectedBranchId !== null &&
+      rows.some((row) => String(row.id) === selectedBranchId);
+
+    if (!hasSelected) {
+      selectBranchGlobal(String(rows[0].id));
+    }
+  }, [rows, selectedBranchId, selectBranchGlobal]);
+
   const skeletonCount = rows.length > 0 ? rows.length : 5;
 
   return (
     <AuthGuard>
-      <main className="min-h-screen flex flex-col bg-[rgba(242,243,244,1)]">
+      <main className="flex min-h-screen flex-col bg-[rgba(242,243,244,1)]">
         <div className="flex-1">
           <div className="px-8 pt-6">
-            {/* Header */}
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-1">
                 <div
@@ -182,8 +322,8 @@ export default function BranchesPage() {
                 <button
                   ref={userBtnRef}
                   type="button"
-                  onClick={() => setUserOpen((v) => !v)}
-                  className="h-12 w-[220px] rounded-[16px] border border-[#E5E7EB] bg-[#2B2E39] px-5 text-[14px] font-medium text-white shadow-[0_6px_18px_rgba(17,24,39,0.08)] cursor-pointer"
+                  onClick={() => setUserOpen((prev) => !prev)}
+                  className="h-12 w-[220px] cursor-pointer rounded-[16px] border border-[#E5E7EB] bg-[#2B2E39] px-5 text-[14px] font-medium text-white shadow-[0_6px_18px_rgba(17,24,39,0.08)]"
                 >
                   {userName}
                 </button>
@@ -191,37 +331,40 @@ export default function BranchesPage() {
                 {userOpen && (
                   <div
                     ref={userPopRef}
-                    className="absolute right-0 top-[56px] w-[280px] rounded-[14px] bg-white border border-[#E5E7EB] shadow-[0_18px_40px_rgba(17,24,39,0.18)] p-4 z-30"
+                    className="absolute right-0 top-[56px] z-30 w-[280px] rounded-[14px] border border-[#E5E7EB] bg-white p-4 shadow-[0_18px_40px_rgba(17,24,39,0.18)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3">
-                        <div className="w-10 flex justify-center">
-                          <UserIcon className="w-8 h-8 text-[#111827] ml-[9px]" />
+                        <div className="flex w-10 justify-center">
+                          <UserIcon className="ml-[9px] h-8 w-8 text-[#111827]" />
                         </div>
                         <div>
-                          <div className="text-[14px] text-[#111827] leading-5">
+                          <div className="text-[14px] leading-5 text-[#111827]">
                             {userName}
                           </div>
-                          <div className="text-[12px] text-[#9CA3AF] leading-4">
+                          <div className="text-[12px] leading-4 text-[#9CA3AF]">
                             {userEmail}
                           </div>
                         </div>
                       </div>
+
                       <button
                         type="button"
                         onClick={() => setUserOpen(false)}
-                        className="h-8 w-8 rounded-full hover:bg-[#F3F4F6] flex items-center justify-center text-[#6B7280]"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-[#6B7280] hover:bg-[#F3F4F6]"
                       >
                         ✕
                       </button>
                     </div>
+
                     <button
                       type="button"
                       onClick={() => {
                         authApi.logout();
-                        router.push("/login");
+                        resetBranchesStore();
+                        router.replace("/login");
                       }}
-                      className="mt-3 w-full h-10 rounded-[10px] bg-[#2B2E39] text-white text-[13px] font-semibold shadow-[0_10px_24px_rgba(17,24,39,0.14)] cursor-pointer hover:opacity-90 transition"
+                      className="mt-3 h-10 w-full cursor-pointer rounded-[10px] bg-[#2B2E39] text-[13px] font-semibold text-white shadow-[0_10px_24px_rgba(17,24,39,0.14)] transition hover:opacity-90"
                     >
                       Выйти
                     </button>
@@ -234,42 +377,58 @@ export default function BranchesPage() {
               Аналитика по филиалам
             </h1>
 
-            {/* Period selector */}
             <div className="mt-4 flex items-center gap-6">
               <div className="flex overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
-                {(["week", "30", "90", "year"] as Period[]).map((p) => (
+                {(["week", "30", "90", "year"] as Period[]).map((value) => (
                   <button
-                    key={p}
+                    key={value}
                     type="button"
                     className={`px-5 py-2.5 text-[13px] transition-colors ${
-                      period === p
-                        ? "bg-[#F3F4F6] text-[#111827] font-medium"
+                      activePreset === value
+                        ? "bg-[#F3F4F6] font-medium text-[#111827]"
                         : "text-[#9CA3AF] hover:bg-black/[0.02]"
                     }`}
-                    onClick={() => setPeriodAndReload(p)}
+                    onClick={() => {
+                      const next = getDateRangeByPeriod(value, new Date());
+                      setActivePreset(value);
+                      setDateFrom(toISODate(next.start));
+                      setDateTo(toISODate(next.end));
+                    }}
                   >
-                    {p === "week"
+                    {value === "week"
                       ? "Неделя"
-                      : p === "year"
+                      : value === "year"
                       ? "Год"
-                      : `${p} дней`}
+                      : `${value} дней`}
                   </button>
                 ))}
               </div>
 
-              <input
-                value={rangeLabel}
-                readOnly
-                className="h-10 w-[200px] rounded-[12px] border border-[#E5E7EB] bg-white px-4 text-[13px] text-[#9CA3AF] text-center outline-none"
-              />
+              <div className="flex items-center gap-2">
+                <DateField
+                  value={dateFrom}
+                  formatRu={formatRu}
+                  onChange={(next) => {
+                    setActivePreset(null);
+                    setDateFrom(next);
+                  }}
+                />
+                <span className="text-[13px] text-[#9CA3AF]">—</span>
+                <DateField
+                  value={dateTo}
+                  formatRu={formatRu}
+                  onChange={(next) => {
+                    setActivePreset(null);
+                    setDateTo(next);
+                  }}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Table */}
           <div className="px-8 pb-6 pt-6">
             <div className="rounded-[12px] border border-[#E5E7EB] bg-white">
               <div className="px-6 py-4">
-                {/* Table header */}
                 <div className="grid grid-cols-[1.6fr_0.6fr_0.7fr_0.9fr_0.8fr_0.9fr] gap-4 border-b border-[#E5E7EB] pb-3 text-[12px] font-semibold text-[#111827]">
                   <div>Филиал</div>
                   <div className="text-center">Запросов</div>
@@ -279,17 +438,15 @@ export default function BranchesPage() {
                   <div className="text-center">NPS по всем оценкам</div>
                 </div>
 
-                {/* Fixed-height body — no layout shift */}
                 <div className="min-h-[320px]">
                   {error ? (
                     <div className="py-10 text-[13px] text-[#991B1B]">
                       {error}
                     </div>
-                  ) : loading ? (
-                    // Skeleton rows — same grid as real rows, same count
+                  ) : initialLoading ? (
                     <div className="divide-y divide-[#EEF2F7] opacity-60">
-                      {Array.from({ length: skeletonCount }).map((_, i) => (
-                        <SkeletonRow key={i} />
+                      {Array.from({ length: skeletonCount }).map((_, index) => (
+                        <SkeletonRow key={index} />
                       ))}
                     </div>
                   ) : rows.length === 0 ? (
@@ -297,76 +454,84 @@ export default function BranchesPage() {
                       Нет данных за выбранный период
                     </div>
                   ) : (
-                    <div className="divide-y divide-[#EEF2F7]">
-                      {rows.map((r) => {
-                        const selected = String(r.id) === selectedId;
-                        return (
-                          <button
-                            key={r.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedId(String(r.id));
-                              setSelectedName(r.name);
-                              selectBranchGlobal(String(r.id));
-                            }}
-                            className={`grid w-full grid-cols-[1.6fr_0.6fr_0.7fr_0.9fr_0.8fr_0.9fr] gap-4 py-4 text-left text-[14px] transition ${
-                              selected ? "bg-[#F8FAFC]" : "hover:bg-[#FAFAFA]"
-                            }`}
-                          >
-                            <div className="text-[#111827]">
-                              <span className="underline decoration-[#D1D5DB] underline-offset-4">
-                                {r.name}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-center text-[#111827]">
-                              {r.requests}
-                            </div>
-                            <div className="flex items-center justify-center text-[#111827]">
-                              {r.newReviews}
-                            </div>
-                            <div className="flex items-center justify-center text-[#111827]">
-                              {r.interceptedComplaints}
-                            </div>
-                            <div className="flex items-center justify-center">
-                              <Badge
-                                value={r.avgRating.toFixed(1)}
-                                kind={ratingKind(r.avgRating)}
-                              />
-                            </div>
-                            <div className="flex items-center justify-center">
-                              <Badge
-                                value={`${r.nps}%`}
-                                kind={npsKind(r.nps)}
-                              />
-                            </div>
-                          </button>
-                        );
-                      })}
+                    <div className="relative">
+                      {loading && (
+                        <div className="absolute inset-0 z-10 rounded-[8px] bg-white/55 backdrop-blur-[1px]" />
+                      )}
+
+                      <div className="divide-y divide-[#EEF2F7]">
+                        {rows.map((row) => {
+                          const isSelected =
+                            String(row.id) === selectedBranchId;
+
+                          return (
+                            <button
+                              key={row.id}
+                              type="button"
+                              onClick={() => selectBranchGlobal(String(row.id))}
+                              className={`grid w-full grid-cols-[1.6fr_0.6fr_0.7fr_0.9fr_0.8fr_0.9fr] gap-4 py-4 text-left text-[14px] transition ${
+                                isSelected
+                                  ? "bg-[#F8FAFC]"
+                                  : "hover:bg-[#FAFAFA]"
+                              }`}
+                            >
+                              <div className="text-[#111827]">
+                                <span className="underline decoration-[#D1D5DB] underline-offset-4">
+                                  {row.name}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-center text-[#111827]">
+                                {row.requests}
+                              </div>
+                              <div className="flex items-center justify-center text-[#111827]">
+                                {row.newReviews}
+                              </div>
+                              <div className="flex items-center justify-center text-[#111827]">
+                                {row.interceptedComplaints}
+                              </div>
+                              <div className="flex items-center justify-center">
+                                <Badge
+                                  value={row.avgRating.toFixed(1)}
+                                  kind={ratingKind(row.avgRating)}
+                                />
+                              </div>
+                              <div className="flex items-center justify-center">
+                                <Badge
+                                  value={`${row.nps}%`}
+                                  kind={npsKind(row.nps)}
+                                />
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Footer row */}
-            <div className="mt-4 flex items-center justify-between">
-              <div className="text-[13px] text-[#6B7280]">
-                {displayName
-                  ? `Вы выбрали: ${displayName}`
-                  : "Выберите филиал из списка"}
+            <div className="mt-4 flex min-h-[40px] items-center justify-between gap-4">
+              <div className="min-w-0 flex-1 text-[13px] text-[#6B7280]">
+                <span className="block truncate">
+                  {selectedBranch
+                    ? `Вы выбрали: ${selectedBranch.name}`
+                    : "Выберите филиал из списка"}
+                </span>
               </div>
 
               <button
                 type="button"
-                disabled={!displayName}
+                disabled={!selectedBranchId}
                 onClick={() => {
-                  if (!selectedBranch && !selectedId) return;
+                  if (!selectedBranchId) return;
                   router.push("/analytics");
                 }}
-                className={`h-10 rounded-[10px] px-4 text-[13px] font-semibold transition ${
-                  displayName
+                className={`h-10 shrink-0 rounded-[10px] px-4 text-[13px] font-semibold transition ${
+                  selectedBranchId
                     ? "bg-yellow-400 text-[#111827] hover:bg-yellow-300 active:brightness-90"
-                    : "bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed"
+                    : "cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]"
                 }`}
               >
                 Выбрать филиал
@@ -378,7 +543,7 @@ export default function BranchesPage() {
         <footer className="mt-auto pb-6">
           <div className="px-6">
             <div className="flex items-center gap-6 text-[12px] leading-[14px]">
-              <span className="text-[#111827] text-[14px] font-semibold">
+              <span className="text-[14px] font-semibold text-[#111827]">
                 Все права защищены © ООО «Фидбэк»
               </span>
               <a

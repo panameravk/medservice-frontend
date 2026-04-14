@@ -1,12 +1,13 @@
 @import "tailwindcss";
 
+html,
 body {
   margin: 0;
   padding: 0;
   background: white;
+}
 
-  .auth-card {
-    @apply rounded-[16px] border border-[#E5E7EB] bg-white px-6 py-6;
-    box-shadow: 0px 6px 15px rgba(17, 24, 39, 0.08);
-  }
+.auth-card {
+  @apply rounded-[16px] border border-[#E5E7EB] bg-white px-6 py-6;
+  box-shadow: 0px 6px 15px rgba(17, 24, 39, 0.08);
 }

@@ -1,57 +1,68 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { authApi } from "../../lib/api";
+import { ApiError, authApi } from "../../lib/api";
 
-type State = "idle" | "loading" | "success" | "error";
+type ViewState = "idle" | "loading" | "success" | "error";
 
 export default function ForgotPasswordPage() {
-  const [username, setUsername] = useState("");
-  const [state, setState] = useState<State>("idle");
+  const [email, setEmail] = useState("");
+  const [state, setState] = useState<ViewState>("idle");
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    setError(null);
     setState("loading");
+
     try {
-      await authApi.forgotPassword(username);
-      setState("success"); // Бэкенд всегда возвращает 200 OK
-    } catch {
+      await authApi.forgotPassword(email.trim());
+      setState("success");
+    } catch (error: unknown) {
+      if (error instanceof ApiError) {
+        setError(error.message);
+      } else if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("Что-то пошло не так. Попробуйте ещё раз.");
+      }
+
       setState("error");
     }
   };
 
   return (
     <>
-      {/* Карточка */}
       <div className="auth-card">
         {state === "success" ? (
-          <p className="text-sm text-gray-600">
-            Если такой пользователь существует — инструкции отправлены.
-          </p>
+          <div className="rounded-[12px] bg-[#DCFCE7] px-5 py-6">
+            <p className="text-center text-[20px] font-medium leading-[30px] text-[#166534]">
+              Если указанный email зарегистрирован, на него отправлена ссылка
+              для восстановления пароля.
+            </p>
+          </div>
         ) : (
           <form className="space-y-4" onSubmit={handleSubmit}>
-            {/* Email / логин */}
             <input
-              type="text"
+              type="email"
               placeholder="Email"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
               required
-              className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-sm outline-none focus:bg-white"
+              disabled={state === "loading"}
+              className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-sm outline-none focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
             />
 
-            {state === "error" && (
-              <p className="text-sm text-red-500">
-                Что-то пошло не так. Попробуйте ещё раз.
-              </p>
+            {state === "error" && error && (
+              <p className="text-sm text-red-500">{error}</p>
             )}
 
-            {/* Кнопка */}
             <button
               type="submit"
               disabled={state === "loading"}
-              className="h-11 w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] hover:bg-yellow-300 active:brightness-90 disabled:opacity-60"
+              className="h-11 w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:bg-yellow-300 active:brightness-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {state === "loading" ? "Отправка..." : "Восстановить пароль"}
             </button>
@@ -59,14 +70,13 @@ export default function ForgotPasswordPage() {
         )}
       </div>
 
-      {/* Ссылка ниже */}
       <div className="mt-6 text-center">
-        <Link
-          href="#"
+        <a
+          href="/login"
           className="text-[12px] text-[#9CA3AF] underline decoration-transparent underline-offset-4 hover:decoration-[#9CA3AF]"
         >
-          Написать в техподдержку
-        </Link>
+          Вернуться ко входу
+        </a>
       </div>
     </>
   );

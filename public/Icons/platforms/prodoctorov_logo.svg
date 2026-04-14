@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- Non-official, brand-inspired icon -->
+  <circle cx="32" cy="32" r="30" fill="#2B6DE0"/>
+  <path d="M30 16h4v12h12v4H34v12h-4V32H18v-4h12V16Z" fill="#FFFFFF"/>
+  <path d="M32 54c12.2 0 22-9.8 22-22S44.2 10 32 10 10 19.8 10 32s9.8 22 22 22Z" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="3"/>
+</svg>

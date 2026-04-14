@@ -1,4 +1,3 @@
-// src/components/Brand.tsx
 import { Unbounded } from "next/font/google";
 import { cn } from "../lib/cn";
 
@@ -14,14 +13,14 @@ export function Brand({
   size?: "sm" | "md";
   className?: string;
 }) {
-  const isSm = size === "sm";
+  const isSmall = size === "sm";
 
   return (
     <div className={cn("flex items-start gap-1", className)}>
       <div
         className={cn(
           unbounded.className,
-          isSm
+          isSmall
             ? "text-[28px] font-[900] tracking-[-0.02em]"
             : "text-[42px] font-[600] tracking-[-0.01em]",
           "text-[#111827]"
@@ -33,7 +32,7 @@ export function Brand({
       <div
         className={cn(
           unbounded.className,
-          isSm ? "mt-[6px] text-[12px]" : "mt-[9px] text-[15px]",
+          isSmall ? "mt-[6px] text-[12px]" : "mt-[9px] text-[15px]",
           "italic font-[600] text-[#111827]"
         )}
       >

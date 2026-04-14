@@ -2,14 +2,63 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Switch } from "../../../components/ui/Switch";
-import { employeesApi, type Employee } from "../../../lib/api";
+import { ApiError, employeesApi, type Employee } from "../../../lib/api";
 import { useBranchesStore } from "../../../lib/branchesStore";
+
+function TrashIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+      <polyline
+        points="3 6 5 6 21 6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 20h9"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export default function EmployeesPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
 
   const [items, setItems] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
@@ -20,13 +69,46 @@ export default function EmployeesPage() {
   );
 
   useEffect(() => {
-    if (!selectedBranchId) return;
+    if (!selectedBranchId) {
+      setItems([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
 
-    setLoading(true);
-    employeesApi
-      .getAll(selectedBranchId)
-      .then(setItems)
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    const loadEmployees = async () => {
+      try {
+        setError(null);
+        setLoading(true);
+
+        const response = await employeesApi.getAll(selectedBranchId);
+
+        if (cancelled) return;
+        setItems(response);
+      } catch (error) {
+        if (cancelled) return;
+
+        if (error instanceof ApiError) {
+          setError(error.message);
+        } else {
+          setError("Не удалось загрузить сотрудников");
+        }
+
+        setItems([]);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadEmployees();
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedBranchId]);
 
   const openCreate = () => {
@@ -34,25 +116,45 @@ export default function EmployeesPage() {
     setIsOpen(true);
   };
 
-  const openEdit = (emp: Employee) => {
-    setEditing(emp);
+  const openEdit = (employee: Employee) => {
+    setEditing(employee);
     setIsOpen(true);
   };
 
   const remove = async (id: number) => {
-    await employeesApi.delete(id);
-    setItems((p) => p.filter((x) => x.id !== id));
+    setError(null);
+
+    try {
+      await employeesApi.delete(id);
+      setItems((prev) => prev.filter((item) => item.id !== id));
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setError(error.message);
+      } else {
+        setError("Не удалось удалить сотрудника");
+      }
+    }
   };
 
   const toggleRequests = async (id: number) => {
-    const current = items.find((x) => x.id === id);
+    const current = items.find((item) => item.id === id);
     if (!current) return;
 
-    const updated = await employeesApi.update(id, {
-      active: !current.active,
-    });
+    setError(null);
 
-    setItems((p) => p.map((x) => (x.id === id ? updated : x)));
+    try {
+      const updated = await employeesApi.update(id, {
+        active: !current.active,
+      });
+
+      setItems((prev) => prev.map((item) => (item.id === id ? updated : item)));
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setError(error.message);
+      } else {
+        setError("Не удалось обновить статус сотрудника");
+      }
+    }
   };
 
   const save = async (payload: {
@@ -63,26 +165,38 @@ export default function EmployeesPage() {
   }) => {
     if (!selectedBranchId) return;
 
-    if (payload.id) {
-      const updated = await employeesApi.update(payload.id, {
-        name: payload.name,
-        active: payload.active,
-        profiles: payload.profiles,
-      });
+    setError(null);
 
-      setItems((p) => p.map((x) => (x.id === payload.id ? updated : x)));
-    } else {
-      const created = await employeesApi.create(selectedBranchId, {
-        name: payload.name,
-        active: payload.active,
-        profiles: payload.profiles,
-      });
+    try {
+      if (payload.id) {
+        const updated = await employeesApi.update(payload.id, {
+          name: payload.name,
+          active: payload.active,
+          profiles: payload.profiles,
+        });
 
-      setItems((p) => [created, ...p]);
+        setItems((prev) =>
+          prev.map((item) => (item.id === payload.id ? updated : item))
+        );
+      } else {
+        const created = await employeesApi.create(selectedBranchId, {
+          name: payload.name,
+          active: payload.active,
+          profiles: payload.profiles,
+        });
+
+        setItems((prev) => [created, ...prev]);
+      }
+
+      setIsOpen(false);
+      setEditing(null);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setError(error.message);
+      } else {
+        setError("Не удалось сохранить сотрудника");
+      }
     }
-
-    setIsOpen(false);
-    setEditing(null);
   };
 
   if (!selectedBranchId) {
@@ -99,66 +213,72 @@ export default function EmployeesPage() {
         <button
           type="button"
           onClick={openCreate}
-          className="h-10 px-4 rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] hover:bg-yellow-300 active:brightness-90"
+          className="h-10 rounded-[10px] bg-[#F4C21A] px-4 text-[13px] font-semibold text-[#111827] hover:bg-yellow-300 active:brightness-90"
         >
           Добавить сотрудника
         </button>
       </div>
 
+      {error && (
+        <div className="rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
+          {error}
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-[12px] border border-[#E5E7EB]">
         <table className="w-full border-collapse bg-white">
           <thead>
             <tr className="text-left text-[12px] text-[#6B7280]">
-              <th className="py-3 px-4 w-[120px]">Запросы</th>
-              <th className="py-3 px-4">ФИО</th>
-              <th className="py-3 px-4">Профили</th>
-              <th className="py-3 px-4 w-[120px]" />
+              <th className="w-[120px] px-4 py-3">Запросы</th>
+              <th className="px-4 py-3">ФИО</th>
+              <th className="px-4 py-3">Профили</th>
+              <th className="w-[120px] px-4 py-3" />
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td className="py-4 px-4 text-sm text-[#9CA3AF]" colSpan={4}>
+                <td className="px-4 py-4 text-sm text-[#9CA3AF]" colSpan={4}>
                   Загрузка...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td className="py-4 px-4 text-sm text-[#9CA3AF]" colSpan={4}>
+                <td className="px-4 py-4 text-sm text-[#9CA3AF]" colSpan={4}>
                   Сотрудников пока нет
                 </td>
               </tr>
             ) : (
-              items.map((e) => (
-                <tr key={e.id} className="border-t border-[#E5E7EB]">
-                  <td className="py-3 px-4">
+              items.map((employee) => (
+                <tr key={employee.id} className="border-t border-[#E5E7EB]">
+                  <td className="px-4 py-3">
                     <label className="inline-flex items-center gap-2">
                       <Switch
-                        checked={e.active}
+                        checked={employee.active}
                         onChange={() => {
-                          void toggleRequests(e.id);
+                          void toggleRequests(employee.id);
                         }}
                       />
                     </label>
                   </td>
 
-                  <td className="py-3 px-4 text-[14px] text-[#111827]">
-                    {e.name}
+                  <td className="px-4 py-3 text-[14px] text-[#111827]">
+                    {employee.name}
                   </td>
 
-                  <td className="py-3 px-4">
-                    {e.profiles.length === 0 ? (
+                  <td className="px-4 py-3">
+                    {employee.profiles.length === 0 ? (
                       <span className="text-[13px] text-[#9CA3AF]">—</span>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {e.profiles.map((url, idx) => (
+                        {employee.profiles.map((url, index) => (
                           <a
-                            key={idx}
+                            key={`${employee.id}-${index}`}
                             href={url}
                             target="_blank"
                             rel="noreferrer"
-                            className="px-3 py-1 rounded-full border border-[#E5E7EB] text-[12px] text-[#111827] hover:bg-[#F3F4F6]"
+                            className="rounded-full border border-[#E5E7EB] px-3 py-1 text-[12px] text-[#111827] hover:bg-[#F3F4F6]"
                           >
                             {url}
                           </a>
@@ -167,25 +287,25 @@ export default function EmployeesPage() {
                     )}
                   </td>
 
-                  <td className="py-3 px-4">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-3 text-[#A3A3A3]">
                       <button
                         type="button"
-                        onClick={() => openEdit(e)}
-                        className="h-9 w-9 rounded-[10px] border border-[#E5E7EB] hover:bg-[#F3F4F6]"
+                        onClick={() => openEdit(employee)}
+                        className="transition hover:text-[#222222]"
                         title="Редактировать"
                       >
-                        ✎
+                        <EditIcon />
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          void remove(e.id);
+                          void remove(employee.id);
                         }}
-                        className="h-9 w-9 rounded-[10px] border border-[#E5E7EB] hover:bg-[#F3F4F6]"
+                        className="transition hover:text-red-500"
                         title="Удалить"
                       >
-                        🗑
+                        <TrashIcon />
                       </button>
                     </div>
                   </td>
@@ -244,7 +364,7 @@ function EmployeeModal({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4">
-      <div className="w-full max-w-[520px] rounded-[12px] bg-white border border-[#E5E7EB] shadow-[0_18px_40px_rgba(17,24,39,0.18)] p-5">
+      <div className="w-full max-w-[520px] rounded-[12px] border border-[#E5E7EB] bg-white p-5 shadow-[0_18px_40px_rgba(17,24,39,0.18)]">
         <div className="flex items-start justify-between gap-3">
           <div className="text-[14px] font-semibold text-[#111827]">
             {title}
@@ -252,7 +372,7 @@ function EmployeeModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 rounded-full hover:bg-[#F3F4F6] flex items-center justify-center text-[#6B7280]"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[#6B7280] hover:bg-[#F3F4F6]"
           >
             ✕
           </button>
@@ -291,7 +411,8 @@ function EmployeeModal({
         <button
           type="button"
           onClick={submit}
-          className="mt-5 h-10 w-full rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] hover:bg-yellow-300 active:brightness-90"
+          disabled={!name.trim()}
+          className="mt-5 h-10 w-full rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] hover:bg-yellow-300 active:brightness-90 disabled:opacity-60"
         >
           Сохранить
         </button>

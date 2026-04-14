@@ -18,33 +18,239 @@ const STATUS_TABS: { label: string; value: RequestStatus | undefined }[] = [
   { label: "Жалоба", value: "complaint" },
 ];
 
-const STATUS_STYLE: Record<
+const STATUS_META: Record<
   string,
-  { color: string; dot: string; label: string }
+  {
+    label: string;
+    color: string;
+    progress: number;
+  }
 > = {
-  published: { color: "#16A34A", dot: "bg-[#16A34A]", label: "Опубликован" },
-  visited: { color: "#F59E0B", dot: "bg-[#F59E0B]", label: "Посетил площадку" },
-  rated: { color: "#F59E0B", dot: "bg-[#F59E0B]", label: "Оценил" },
-  opened: { color: "#6B7280", dot: "bg-[#6B7280]", label: "Открыл" },
-  sent: { color: "#6B7280", dot: "bg-[#D1D5DB]", label: "Отправлен" },
-  complaint: { color: "#DC2626", dot: "bg-[#DC2626]", label: "Жалоба" },
+  published: {
+    label: "Отзыв опубликован",
+    color: "#1ED12F",
+    progress: 1,
+  },
+  visited: {
+    label: "Перешел на сайт отзывов",
+    color: "#E6D100",
+    progress: 0.78,
+  },
+  rated: {
+    label: "Поставил оценку",
+    color: "#FF8A2A",
+    progress: 0.56,
+  },
+  opened: {
+    label: "Открыл ссылку",
+    color: "#9B9B9B",
+    progress: 0.38,
+  },
+  sent: {
+    label: "Запрос отправлен",
+    color: "#D9D9D9",
+    progress: 0,
+  },
+  complaint: {
+    label: "Жалоба",
+    color: "#FF1E1E",
+    progress: 1,
+  },
 };
 
-function StatusDot({ status }: { status: RequestStatus | null }) {
-  if (!status) return <span className="text-[#9CA3AF]">—</span>;
-  const s = STATUS_STYLE[status] ?? {
-    color: "#6B7280",
-    dot: "bg-[#D1D5DB]",
-    label: status,
-  };
+const PLATFORM_META: Record<
+  string,
+  {
+    label: string;
+    icon?: string;
+  }
+> = {
+  yandex_maps: {
+    label: "Яндекс.Карты",
+    icon: "/Icons/platforms/yandex-maps-logo.svg",
+  },
+  google_maps: {
+    label: "Google Maps",
+    icon: "/Icons/platforms/google-maps-sign-logo.svg",
+  },
+  "2gis": {
+    label: "2Gis",
+    icon: "/Icons/platforms/2gis-icon-logo.svg",
+  },
+  prodoctorov: {
+    label: "ПроДокторов",
+    icon: "/Icons/platforms/prodoctorov_logo.svg",
+  },
+  napopravku: {
+    label: "НаПоправку",
+    icon: "/Icons/platforms/napopravku_logo.svg",
+  },
+};
+
+function ProgressRing({
+  color,
+  progress,
+  size = 18,
+  stroke = 4,
+}: {
+  color: string;
+  progress: number;
+  size?: number;
+  stroke?: number;
+}) {
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(1, progress));
+  const dashOffset = circumference * (1 - clamped);
 
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={`h-3 w-3 rounded-full ${s.dot}`} />
-      <span style={{ color: s.color }} className="text-[12px]">
-        {s.label}
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="block"
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="#E5E5E5"
+        strokeWidth={stroke}
+      />
+      {clamped > 0 ? (
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      ) : null}
+    </svg>
+  );
+}
+
+function StatusIndicator({
+  status,
+  rating,
+}: {
+  status: RequestStatus | null;
+  rating?: number | null;
+}) {
+  if (!status) {
+    return <span className="text-[#B8B8B8]">—</span>;
+  }
+
+  const meta = STATUS_META[status] ?? {
+    label: status,
+    color: "#D9D9D9",
+    progress: 0,
+  };
+
+  const showScore =
+    typeof rating === "number" &&
+    status !== "sent" &&
+    status !== "opened" &&
+    rating > 0;
+
+  return (
+    <div className="flex items-center gap-[4px]">
+      <ProgressRing color={meta.color} progress={meta.progress} />
+      {showScore ? (
+        <span className="inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-[3px] border border-[#E7E7E7] bg-white px-[3px] text-[10px] leading-none text-[#B4B4B4]">
+          {rating}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function PlatformBadge({ request }: { request: ReviewRequest }) {
+  const reviewUrl =
+    "reviewUrl" in request && typeof request.reviewUrl === "string"
+      ? request.reviewUrl
+      : "";
+
+  if (request.platform === "complaint") {
+    const content = (
+      <span className="inline-flex h-[24px] items-center gap-[7px] rounded-[4px] border border-[#E7E7E7] bg-white px-[10px] text-[11px] text-[#9B9B9B]">
+        <span className="text-[#FF1E1E]">⚡</span>
+        <span>Жалоба</span>
       </span>
+    );
+
+    return content;
+  }
+
+  if (!request.platform) {
+    return <span className="text-[#B8B8B8]">—</span>;
+  }
+
+  const meta = PLATFORM_META[request.platform];
+  if (!meta) {
+    return <span className="text-[#B8B8B8]">—</span>;
+  }
+
+  const content = (
+    <span className="inline-flex h-[24px] items-center gap-[7px] rounded-[4px] border border-[#E7E7E7] bg-white px-[10px] text-[11px] text-[#9B9B9B]">
+      {meta.icon ? (
+        <img src={meta.icon} alt="" className="h-[14px] w-[14px] shrink-0" />
+      ) : null}
+      <span>{meta.label}</span>
     </span>
+  );
+
+  if (reviewUrl) {
+    return (
+      <a href={reviewUrl} target="_blank" rel="noreferrer">
+        {content}
+      </a>
+    );
+  }
+
+  return content;
+}
+
+function FilterChip({
+  label,
+  active,
+  status,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  status?: RequestStatus;
+  onClick: () => void;
+}) {
+  const meta = status ? STATUS_META[status] : null;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "inline-flex h-[28px] items-center gap-[6px] rounded-[6px] border px-[9px] text-[11px] transition-colors",
+        active
+          ? "border-[#111111] bg-[#111111] text-white"
+          : "border-[#E7E7E7] bg-white text-[#B7B7B7] hover:bg-[#FAFAFA]",
+      ].join(" ")}
+    >
+      {meta ? (
+        <ProgressRing
+          color={meta.color}
+          progress={meta.progress}
+          size={16}
+          stroke={4}
+        />
+      ) : null}
+      <span className="whitespace-nowrap">{label}</span>
+    </button>
   );
 }
 
@@ -61,22 +267,39 @@ export default function RequestStatusPage() {
   const isLoading = loading || !selectedBranchId;
 
   useEffect(() => {
-    if (!selectedBranchId) return;
+    if (!selectedBranchId) {
+      setRequests([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
-    getRequests({ branchId: selectedBranchId, status: statusFilter })
-      .then((res) => {
-        if (!cancelled) setRequests(res.requests);
-      })
-      .catch(() => {
-        if (!cancelled) setError("Не удалось загрузить запросы");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const loadRequests = async () => {
+      try {
+        setError(null);
+        setLoading(true);
+
+        const response = await getRequests({
+          branchId: selectedBranchId,
+          status: statusFilter,
+        });
+
+        if (cancelled) return;
+        setRequests(response.requests);
+      } catch {
+        if (cancelled) return;
+        // Не очищаем список при смене фильтра — так контейнер/строки не "прыгают"
+        setError("Не удалось загрузить запросы");
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadRequests();
 
     return () => {
       cancelled = true;
@@ -84,96 +307,91 @@ export default function RequestStatusPage() {
   }, [selectedBranchId, statusFilter]);
 
   return (
-    <div className="p-4">
-      <div className="flex flex-wrap items-center gap-3 border-b border-[#E5E7EB] pb-4">
-        <div className="text-[12px] font-semibold text-[#111827]">
+    <div className="min-h-[420px] p-4">
+      <div className="border-b border-[#E5E5E5] pb-3">
+        <div className="text-[12px] font-medium text-[#111111]">
           Статус запроса
         </div>
 
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.label}
-            type="button"
-            onClick={() => setStatusFilter(tab.value)}
-            className={[
-              "inline-flex items-center rounded-[6px] border px-2 py-1 text-[12px] transition",
-              statusFilter === tab.value
-                ? "border-[#111827] bg-[#111827] text-white"
-                : "border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6]",
-            ].join(" ")}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <div className="mt-2 flex items-center gap-[6px] overflow-x-auto whitespace-nowrap">
+          {STATUS_TABS.map((tab) => (
+            <FilterChip
+              key={tab.label}
+              label={tab.label}
+              status={tab.value}
+              active={statusFilter === tab.value}
+              onClick={() => setStatusFilter(tab.value)}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-[12px] border border-[#E5E7EB]">
-        <div className="grid grid-cols-[180px_1.4fr_180px_160px_180px] gap-3 bg-[#F9FAFB] px-4 py-3 text-[12px] font-semibold text-[#111827]">
+      <div className="mt-3 overflow-hidden rounded-[12px] border border-[#E5E5E5] bg-white">
+        <div className="grid grid-cols-[64px_1.5fr_170px_150px_210px] gap-3 px-4 py-3 text-[12px] font-medium text-[#111111]">
           <div>Статус</div>
           <div>Имя</div>
           <div>Телефон</div>
           <div>Дата запроса</div>
-          <div>Результат</div>
+          <div>Читать отзыв</div>
         </div>
 
-        <div className="divide-y divide-[#EEF2F7]">
-          {isLoading ? (
-            Array.from({ length: 10 }).map((_, i) => (
+        <div className="relative">
+          {loading && requests.length > 0 && (
+            <div className="absolute inset-0 z-10 bg-white/55 backdrop-blur-[1px]" />
+          )}
+
+          <div className="divide-y divide-[#EEEEEE]">
+            {isLoading && requests.length === 0 ? (
+            Array.from({ length: 10 }).map((_, index) => (
               <div
-                key={i}
-                className="grid grid-cols-[180px_1.4fr_180px_160px_180px] gap-3 px-4 py-3"
+                key={index}
+                className="grid grid-cols-[64px_1.5fr_170px_150px_210px] gap-3 px-4 py-3"
               >
-                <div className="h-3 w-20 rounded bg-black/5" />
-                <div className="h-3 w-48 rounded bg-black/5" />
-                <div className="h-3 w-28 rounded bg-black/5" />
-                <div className="h-3 w-20 rounded bg-black/5" />
-                <div className="h-3 w-16 rounded bg-black/5" />
+                <div className="h-4 w-8 rounded bg-black/5" />
+                <div className="h-4 w-40 rounded bg-black/5" />
+                <div className="h-4 w-28 rounded bg-black/5" />
+                <div className="h-4 w-20 rounded bg-black/5" />
+                <div className="h-6 w-24 rounded bg-black/5" />
               </div>
             ))
-          ) : error ? (
+            ) : error ? (
             <div className="px-4 py-6 text-sm text-red-500">{error}</div>
-          ) : requests.length === 0 ? (
+            ) : requests.length === 0 ? (
             <div className="px-4 py-6 text-sm text-[#9CA3AF]">
               Нет запросов по выбранному фильтру
             </div>
-          ) : (
-            requests.map((req) => (
+            ) : (
+            requests.map((request) => (
               <div
-                key={req.id}
-                className="grid grid-cols-[180px_1.4fr_180px_160px_180px] gap-3 px-4 py-3 text-[13px] text-[#111827]"
+                key={request.id}
+                className="grid grid-cols-[64px_1.5fr_170px_150px_210px] gap-3 px-4 py-3 text-[12px] text-[#3D3D3D]"
               >
-                <div>
-                  <StatusDot status={req.status} />
+                <div className="flex items-center">
+                  <StatusIndicator
+                    status={request.status}
+                    rating={request.rating ?? null}
+                  />
                 </div>
 
-                <div>{req.clientName}</div>
+                <div className="flex items-center">{request.clientName}</div>
 
-                <div className="text-[#6B7280]">{req.clientPhone}</div>
+                <div className="flex items-center">{request.clientPhone}</div>
 
-                <div className="text-[#6B7280]">
-                  {new Date(req.sentAt).toLocaleDateString("ru-RU", {
+                <div className="flex items-center text-[#9D9D9D]">
+                  {new Date(request.sentAt).toLocaleDateString("ru-RU", {
                     day: "2-digit",
                     month: "2-digit",
                     year: "numeric",
                   })}
                 </div>
 
-                <div>
-                  {req.platform === "complaint" ? (
-                    <span className="inline-flex items-center gap-1 rounded-[6px] border border-[#FEE2E2] bg-[#FEF2F2] px-2 py-1 text-[12px] text-[#DC2626]">
-                      Жалоба
-                    </span>
-                  ) : req.rating !== null ? (
-                    <span className="inline-flex items-center rounded-[6px] border border-[#E5E7EB] px-2 py-1 text-[12px] text-[#6B7280]">
-                      {req.platform || "Площадка"} · ★ {req.rating}
-                    </span>
-                  ) : (
-                    <span className="text-[#9CA3AF]">—</span>
-                  )}
+                <div className="flex items-center">
+                  <PlatformBadge request={request} />
                 </div>
               </div>
             ))
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

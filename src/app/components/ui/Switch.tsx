@@ -6,21 +6,27 @@ type SwitchProps = {
   disabled?: boolean;
 };
 
-export function Switch({ checked, onChange, disabled }: SwitchProps) {
+export function Switch({ checked, onChange, disabled = false }: SwitchProps) {
   return (
     <button
       type="button"
-      onClick={() => !disabled && onChange(!checked)}
+      role="switch"
+      aria-checked={checked}
+      aria-disabled={disabled}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
       className={[
-        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200",
-        checked ? "bg-[#22C55E]" : "bg-[#D1D5DB]",
-        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+        "relative inline-flex h-[16px] w-[28px] shrink-0 items-center rounded-full",
+        "transition-all duration-200 ease-out",
+        checked ? "bg-[#34C759]" : "bg-[#D9D9D9]",
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
       ].join(" ")}
     >
       <span
         className={[
-          "inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200",
-          checked ? "translate-x-6" : "translate-x-1",
+          "absolute left-[2px] h-[12px] w-[12px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)]",
+          "transition-transform duration-200 ease-out",
+          checked ? "translate-x-[12px]" : "translate-x-0",
         ].join(" ")}
       />
     </button>

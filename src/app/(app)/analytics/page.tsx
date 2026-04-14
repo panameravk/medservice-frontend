@@ -1,287 +1,725 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getAnalytics, getReviews, type Review } from "../../lib/api";
-import type { AnalyticsData } from "../../types/analytics";
+import { getDashboard, type DashboardData, type Period } from "../../lib/api";
 import { useBranchesStore } from "../../lib/branchesStore";
-import { getDateRangeByPeriod, type Period } from "../../lib/date";
+import { getDateRangeByPeriod } from "../../lib/date";
+
+function EmptyState({ text }: { text: string }) {
+  return <p className="text-[13px] text-[#9CA3AF]">{text}</p>;
+}
+
+function MetricStat({
+  value,
+  labelTop,
+  labelBottom,
+  valueClassName = "text-[#111827]",
+}: {
+  value: string | number;
+  labelTop: string;
+  labelBottom: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <div className={`text-[36px] font-[700] leading-none ${valueClassName}`}>
+        {value}
+      </div>
+      <div className="pt-[2px] text-[12px] leading-[13px] text-[#111827]">
+        <div>{labelTop}</div>
+        <div>{labelBottom}</div>
+      </div>
+    </div>
+  );
+}
+
+function PlatformIcon({ platform }: { platform: string }) {
+  const iconMap: Record<string, string> = {
+    yandex_maps: "/Icons/platforms/yandex-maps-logo.svg",
+    google_maps: "/Icons/platforms/google-maps-sign-logo.svg",
+    "2gis": "/Icons/platforms/2gis-icon-logo.svg",
+    prodoctorov: "/Icons/platforms/prodoctorov_logo.svg",
+    napopravku: "/Icons/platforms/napopravku_logo.svg",
+  };
+
+  const src = iconMap[platform];
+  if (!src) {
+    return <span className="inline-block h-5 w-5 rounded-full bg-[#D1D5DB]" />;
+  }
+
+  return <img src={src} alt="" className="h-5 w-5 shrink-0" />;
+}
+
+function PlatformToggle({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={enabled}
+      className={[
+        "relative inline-flex h-[20px] w-[35px] shrink-0 items-center rounded-full",
+        "transition-all duration-200 ease-out",
+        enabled ? "bg-[#34C759]" : "bg-[#D9D9D9]",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "absolute left-[2px] h-[16px] w-[16px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)]",
+          "transition-transform duration-200 ease-out",
+          enabled ? "translate-x-[15px]" : "translate-x-0",
+        ].join(" ")}
+      />
+    </button>
+  );
+}
+
+function RatingBadge({ value }: { value: number }) {
+  const cls =
+    value >= 4.7
+      ? "bg-[#DDF7E7] text-[#1F8F52]"
+      : value >= 4.3
+      ? "bg-[#FDE7E7] text-[#C85B5B]"
+      : "bg-[#FDE7E7] text-[#C85B5B]";
+
+  return (
+    <span
+      className={`inline-flex min-w-[40px] items-center justify-center rounded-[6px] px-2.5 py-[2px] text-[15px] font-medium ${cls}`}
+    >
+      {value.toFixed(1)}
+    </span>
+  );
+}
+
+function NegativeBadge({ value }: { value: number }) {
+  const cls =
+    value <= 2
+      ? "bg-[#DDF7E7] text-[#1F8F52]"
+      : value <= 10
+      ? "bg-[#FDE7E7] text-[#C85B5B]"
+      : "bg-[#FADDDD] text-[#B43F3F]";
+
+  return (
+    <span
+      className={`inline-flex min-w-[40px] items-center justify-center rounded-[6px] px-2.5 py-[2px] text-[15px] font-medium ${cls}`}
+    >
+      {value}%
+    </span>
+  );
+}
+
+function SmallBarChart({
+  values,
+  height = 86,
+}: {
+  values: number[];
+  height?: number;
+}) {
+  const safe = values.length ? values : [0];
+  const min = Math.min(...safe);
+  const max = Math.max(...safe);
+  const range = Math.max(max - min, 1);
+
+  return (
+    <div className="flex h-full items-end gap-[8px]">
+      {safe.map((value, index) => {
+        const normalized = ((value - min) / range) * 0.75 + 0.2;
+
+        return (
+          <div
+            key={index}
+            className="w-[10px] rounded-t-[2px] bg-[#D8E5F6]"
+            style={{ height: `${Math.max(10, normalized * height)}px` }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function LargeBarChart({ values }: { values: number[] }) {
+  const safe = values.length ? values : [0];
+  const min = Math.min(...safe);
+  const max = Math.max(...safe);
+  const range = Math.max(max - min, 1);
+
+  return (
+    <div className="flex h-[180px] items-end gap-[8px] border-b border-l border-[#6B7280] pb-[2px] pl-[8px]">
+      {safe.map((value, index) => {
+        const normalized = ((value - min) / range) * 0.78 + 0.15;
+
+        return (
+          <div
+            key={index}
+            className="w-[10px] rounded-t-[2px] bg-[#D8E5F6]"
+            style={{ height: `${Math.max(12, normalized * 180)}px` }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function PercentBadge({
+  value,
+  tone,
+}: {
+  value: number;
+  tone: "green" | "yellow" | "red";
+}) {
+  const cls =
+    tone === "green"
+      ? "bg-[#DDF7E7] text-[#1F8F52]"
+      : tone === "yellow"
+      ? "bg-[#FDF3CC] text-[#A57A00]"
+      : "bg-[#FDE7E7] text-[#C85B5B]";
+
+  return (
+    <span
+      className={`inline-flex min-w-[34px] items-center justify-center rounded-[5px] px-2 py-[1px] text-[12px] font-medium ${cls}`}
+    >
+      {value.toFixed(0)}%
+    </span>
+  );
+}
+
+function ReviewStars({ rating }: { rating: number }) {
+  return (
+    <span className="text-[11px] tracking-[1px] text-[#F4C21A]">
+      {"★".repeat(Math.max(0, Math.min(5, rating)))}
+    </span>
+  );
+}
 
 export default function AnalyticsPage() {
-  const [period, setPeriod] = useState<Period>("30");
-  const rangeLabel = useMemo(
-    () => getDateRangeByPeriod(period).label,
-    [period]
-  );
-
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
 
-  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [period, setPeriod] = useState<Period>("30");
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+
+  const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+  const [useCustomRange, setUseCustomRange] = useState(false);
+  const [dateFrom, setDateFrom] = useState(() =>
+    toISODate(getDateRangeByPeriod(period, currentDate).start)
+  );
+  const [dateTo, setDateTo] = useState(() =>
+    toISODate(getDateRangeByPeriod(period, currentDate).end)
+  );
+
+  const formatRu = (iso: string) => {
+    if (!iso) return "—";
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return iso;
+    return `${d}.${m}.${y}`;
+  };
+
+  function CalendarIcon({ className = "" }: { className?: string }) {
+    return (
+      <svg
+        className={className}
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <path
+          d="M7 3v3M17 3v3"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M4 8h16"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <rect
+          x="5"
+          y="5"
+          width="14"
+          height="16"
+          rx="2"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+      </svg>
+    );
+  }
+
+  function DateField({
+    value,
+    onChange,
+  }: {
+    value: string;
+    onChange: (next: string) => void;
+  }) {
+    return (
+      <div className="relative flex h-10 w-[150px] items-center justify-between gap-2 rounded-[10px] border border-[#E5E7EB] bg-white px-3 text-[13px] text-[#111827] shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+        <span className="tabular-nums">{formatRu(value)}</span>
+        <CalendarIcon className="text-[#9CA3AF]" />
+        <input
+          type="date"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        />
+      </div>
+    );
+  }
+
+  useEffect(() => {
+    if (useCustomRange) return;
+    const next = getDateRangeByPeriod(period, currentDate);
+    setDateFrom(toISODate(next.start));
+    setDateTo(toISODate(next.end));
+  }, [currentDate, period, useCustomRange]);
+
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [platformEnabledMap, setPlatformEnabledMap] = useState<
+    Record<string, boolean>
+  >({});
+
+  useEffect(() => {
+    const now = new Date();
+    const nextMidnight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+      0,
+      0,
+      1
+    );
+
+    const timeoutId = window.setTimeout(() => {
+      setCurrentDate(new Date());
+    }, nextMidnight.getTime() - now.getTime());
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [currentDate]);
 
   useEffect(() => {
     if (!selectedBranchId) {
-      setData(null);
+      setDashboard(null);
+      setError(null);
+      setLoading(false);
+      setPlatformEnabledMap({});
       return;
     }
+
+    if (useCustomRange && dateFrom && dateTo && dateFrom > dateTo) {
+      // Не делаем запрос в "перевёрнутом" диапазоне
+      return;
+    }
+
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    getAnalytics(selectedBranchId, period)
-      .then((res) => {
-        if (!cancelled) setData(res);
-      })
-      .catch(() => {
+
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const data = await getDashboard(
+          selectedBranchId,
+          useCustomRange ? { start: dateFrom, end: dateTo } : { period }
+        );
+
         if (!cancelled) {
-          setError("Не удалось загрузить аналитику");
-          setData(null);
+          setDashboard(data);
+          setPlatformEnabledMap(
+            Object.fromEntries(
+              data.platforms.map((item) => [item.platform, item.enabled])
+            )
+          );
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
+      } catch {
+        if (!cancelled) {
+          setDashboard(null);
+          setError("Не удалось загрузить аналитику");
+          setPlatformEnabledMap({});
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     };
-  }, [selectedBranchId, period]);
 
-  useEffect(() => {
-    if (!selectedBranchId) {
-      setReviews([]);
-      return;
-    }
-    let cancelled = false;
-    setReviewsLoading(true);
-    getReviews({ branchId: selectedBranchId, period, limit: 5 })
-      .then((res) => {
-        if (!cancelled) setReviews(res.reviews);
-      })
-      .catch(() => {
-        if (!cancelled) setReviews([]);
-      })
-      .finally(() => {
-        if (!cancelled) setReviewsLoading(false);
-      });
+    void loadDashboard();
+
     return () => {
       cancelled = true;
     };
-  }, [selectedBranchId, period]);
+  }, [dateFrom, dateTo, period, selectedBranchId, useCustomRange]);
 
   if (!selectedBranchId) {
     return <p className="text-sm text-[#9CA3AF]">Сначала выберите филиал</p>;
   }
 
+  if (error) {
+    return (
+      <div className="rounded-[12px] border border-[#FECACA] bg-[#FEF2F2] p-4 text-sm text-[#B91C1C]">
+        {error}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-4 min-w-0">
-      {/* ── Title + period selector ── */}
+    <div className="flex min-w-0 flex-col gap-4">
       <div>
-        <h1 className="text-[22px] font-bold text-[#111827] leading-7">
+        <h1 className="text-[24px] font-[700] leading-[30px] text-[#111827]">
           Аналитика
         </h1>
-        <p className="mt-1 text-[13px] text-[#6B7280]">
+        <p className="mt-[2px] text-[13px] leading-[16px] text-[#6B7280]">
           Динамика рейтинга и репутации
         </p>
-        <div className="mt-4 flex flex-wrap items-center gap-6">
-          <div className="flex overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
-            {(["week", "30", "90", "year"] as Period[]).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPeriod(p)}
-                className={`px-4 py-2 text-[13px] transition-colors ${
-                  period === p
-                    ? "bg-[#F3F4F6] text-[#111827] font-medium"
-                    : "text-[#9CA3AF] hover:bg-black/[0.02]"
-                }`}
-              >
-                {p === "week" ? "Неделя" : p === "year" ? "Год" : `${p} дней`}
-              </button>
-            ))}
+
+        <div className="mt-4 flex items-center gap-[14px]">
+          <div className="flex h-10 overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
+            {(["week", "30", "90", "year"] as Period[]).map((value) => {
+              const active = period === value;
+
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    setPeriod(value);
+                    setUseCustomRange(false);
+                  }}
+                  className={[
+                    "px-4 text-[13px]",
+                    active
+                      ? "bg-[#F3F4F6] font-medium text-[#111827]"
+                      : "text-[#9CA3AF] hover:bg-black/[0.02]",
+                  ].join(" ")}
+                >
+                  {value === "week"
+                    ? "Неделя"
+                    : value === "year"
+                    ? "Год"
+                    : `${value} дней`}
+                </button>
+              );
+            })}
           </div>
-          <input
-            value={rangeLabel}
-            readOnly
-            className="h-9 w-[190px] rounded-[12px] border border-[#E5E7EB] bg-white px-4 text-[13px] text-[#9CA3AF] text-center outline-none"
-          />
+
+          <div className="flex items-center gap-2">
+            <DateField
+              value={dateFrom}
+              onChange={(next) => {
+                setUseCustomRange(true);
+                setDateFrom(next);
+              }}
+            />
+            <span className="text-[13px] text-[#9CA3AF]">—</span>
+            <DateField
+              value={dateTo}
+              onChange={(next) => {
+                setUseCustomRange(true);
+                setDateTo(next);
+              }}
+            />
+          </div>
         </div>
       </div>
 
-      {/* ── Main two-column layout ── */}
-      <div className="flex gap-4 items-start min-w-0">
-        {/* ── Left column ── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-4">
-          {/* Stats bar */}
-          <div className="rounded-[12px] border border-[#E5E7EB] bg-white px-6 py-4">
-            {loading ? (
-              <div className="flex flex-wrap gap-x-8 gap-y-4">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="h-7 w-10 rounded bg-black/5" />
-                    <div className="space-y-1">
-                      <div className="h-3 w-14 rounded bg-black/5" />
-                      <div className="h-3 w-10 rounded bg-black/5" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : error ? (
-              <div className="text-sm text-red-600">{error}</div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
-                <StatCard
-                  value={data?.sent}
-                  label1="запросов"
-                  label2="отправлено"
-                  color="#111827"
-                />
-                <StatCard
-                  value={data?.reviews}
-                  label1="новых"
-                  label2="отзывов"
-                  color="#16A34A"
-                />
-                <StatCard
-                  value={data?.complaints}
-                  label1="перехвачено"
-                  label2="жалоб"
-                  color="#EF4444"
-                />
-                <StatCard
-                  value={data?.avgRating}
-                  label1="средняя оценка"
-                  label2="новых отзывов"
-                  color="#111827"
-                />
-              </div>
-            )}
+      {loading && !dashboard ? (
+        <div className="space-y-4">
+          <div className="h-[84px] rounded-[12px] bg-white/70" />
+          <div className="h-[205px] rounded-[12px] bg-white/70" />
+          <div className="grid grid-cols-[1fr_1fr] gap-4">
+            <div className="h-[150px] rounded-[12px] bg-white/70" />
+            <div className="h-[150px] rounded-[12px] bg-white/70" />
           </div>
-
-          {/* Platform */}
-          <div className="rounded-2xl bg-white border border-black/5 p-4">
-            <div className="mb-4 text-[14px] font-medium text-[#111827]">
-              Площадка (позже)
-            </div>
-            <div className="h-[240px] rounded-xl bg-black/5" />
-          </div>
-
-          {/* Satisfaction + NPS small */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-2xl bg-white border border-black/5 p-4">
-              <div className="mb-4 text-[14px] font-medium text-[#111827]">
-                Удовлетворенность (позже)
-              </div>
-              <div className="h-[200px] rounded-xl bg-black/5" />
-            </div>
-            <div className="rounded-2xl bg-white border border-black/5 p-4">
-              <div className="mb-4 text-[14px] font-medium text-[#111827]">
-                Динамика NPS (позже)
-              </div>
-              <div className="h-[200px] rounded-xl bg-black/5" />
-            </div>
-          </div>
-
-          {/* Employees */}
-          <div className="rounded-2xl bg-white border border-black/5 p-4">
-            <div className="mb-4 text-[14px] font-medium text-[#111827]">
-              Оценка сотрудников (позже)
-            </div>
-            <div className="h-[280px] rounded-xl bg-black/5" />
-          </div>
-
-          {/* NPS large */}
-          <div className="rounded-2xl bg-white border border-black/5 p-4">
-            <div className="mb-4 text-[14px] font-medium text-[#111827]">
-              Динамика NPS большая (позже)
-            </div>
-            <div className="h-[420px] rounded-xl bg-black/5" />
-          </div>
+          <div className="h-[170px] rounded-[12px] bg-white/70" />
+          <div className="h-[210px] rounded-[12px] bg-white/70" />
         </div>
+      ) : !dashboard ? null : (
+        <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+          <div className="space-y-4">
+            <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
+              <div className="grid grid-cols-4 gap-6">
+                <MetricStat
+                  value={dashboard.sent}
+                  labelTop="отправлено"
+                  labelBottom=""
+                />
+                <MetricStat
+                  value={dashboard.reviews}
+                  labelTop="новых"
+                  labelBottom="отзывов"
+                  valueClassName="text-[#22A652]"
+                />
+                <MetricStat
+                  value={dashboard.complaints}
+                  labelTop="перехвачено"
+                  labelBottom="жалоб"
+                  valueClassName="text-[#E04B4B]"
+                />
+                <MetricStat
+                  value={dashboard.avgRating.toFixed(1)}
+                  labelTop="средняя оценка"
+                  labelBottom="новых отзывов"
+                />
+              </div>
+            </section>
 
-        {/* ── Right column: reviews ── */}
-        <div className="w-[300px] shrink-0 rounded-2xl bg-white border border-black/5 p-4 sticky top-6">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="text-[14px] font-medium text-[#111827]">
+            <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-5 py-4">
+              {dashboard.platforms.length === 0 ? (
+                <EmptyState text="Нет данных по площадкам" />
+              ) : (
+                <table className="w-full table-fixed text-left">
+                  <thead>
+                    <tr className="text-[15px] font-medium text-[#111827]">
+                      <th className="w-[169px] pb-2.5">Площадка</th>
+                      <th className="w-[88px] pb-2.5">Рейтинг</th>
+                      <th className="w-[88px] pb-2.5">Отзывы</th>
+                      <th className="w-[119px] pb-2.5">Всего отзывов</th>
+                      <th className="w-[106px] pb-2.5">Всего негатива</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.platforms.map((item) => (
+                      <tr
+                        key={item.platform}
+                        className="text-[15px] text-[#111827]"
+                      >
+                        <td className="py-[6px] pr-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <PlatformToggle
+                              enabled={
+                                platformEnabledMap[item.platform] ??
+                                item.enabled
+                              }
+                              onToggle={() =>
+                                setPlatformEnabledMap((prev) => ({
+                                  ...prev,
+                                  [item.platform]: !(
+                                    prev[item.platform] ?? item.enabled
+                                  ),
+                                }))
+                              }
+                            />
+                            <PlatformIcon platform={item.platform} />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                        </td>
+                        <td className="py-[6px]">
+                          <RatingBadge value={item.rating} />
+                        </td>
+                        <td className="py-[6px]">{item.reviews}</td>
+                        <td className="py-[6px]">{item.totalReviews}</td>
+                        <td className="py-[6px]">
+                          <div className="flex items-center gap-2.5">
+                            <span>{item.totalNegative}</span>
+                            <NegativeBadge
+                              value={Math.round(item.negativePercent)}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+
+            <div className="grid grid-cols-[1fr_1fr] gap-4">
+              <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
+                <div className="mb-3 text-[14px] font-medium text-[#111827]">
+                  Удовлетворённость
+                </div>
+
+                {dashboard.satisfaction.length === 0 ? (
+                  <EmptyState text="Нет данных по оценкам" />
+                ) : (
+                  <div className="space-y-[8px]">
+                    {dashboard.satisfaction.map((item) => {
+                      const barColor =
+                        item.stars === 5
+                          ? "#2DBE60"
+                          : item.stars === 4
+                          ? "#E7B81D"
+                          : "#E74C3C";
+
+                      return (
+                        <div
+                          key={item.stars}
+                          className="grid grid-cols-[18px_1fr_34px] items-center gap-3"
+                        >
+                          <div className="text-[12px] text-[#111827]">
+                            {item.stars}
+                          </div>
+                          <div className="h-[3px] rounded-full bg-[#D9E1EA]">
+                            <div
+                              className="h-[3px] rounded-full"
+                              style={{
+                                width: `${item.percent}%`,
+                                backgroundColor: barColor,
+                              }}
+                            />
+                          </div>
+                          <div className="text-right text-[12px] text-[#111827]">
+                            {Math.round(item.percent)}%
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
+                <div className="mb-3 text-[14px] font-medium text-[#111827]">
+                  Динамика NPS
+                </div>
+
+                {dashboard.npsSmall.length === 0 ? (
+                  <EmptyState text="Нет данных по NPS" />
+                ) : (
+                  <div className="h-[90px]">
+                    <SmallBarChart
+                      values={dashboard.npsSmall.map((item) => item.nps)}
+                      height={86}
+                    />
+                  </div>
+                )}
+              </section>
+            </div>
+
+            <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
+              <div className="mb-3 text-[14px] font-medium text-[#111827]">
+                Оценка сотрудников
+              </div>
+
+              {dashboard.employees.length === 0 ? (
+                <EmptyState text="В выбранном периоде не найдено упоминаний сотрудников" />
+              ) : (
+                <table className="w-full table-fixed text-left">
+                  <thead>
+                    <tr className="text-[11px] font-medium text-[#111827]">
+                      <th className="w-[170px] pb-2">Сотрудник</th>
+                      <th className="w-[55px] pb-2">Оценок</th>
+                      <th className="w-[42px] pb-2">5 ★</th>
+                      <th className="w-[42px] pb-2">4 ★</th>
+                      <th className="w-[42px] pb-2">3 ★</th>
+                      <th className="w-[42px] pb-2">2 ★</th>
+                      <th className="w-[42px] pb-2">1 ★</th>
+                      <th className="w-[46px] pb-2">Ср. балл</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.employees.map((employee) => (
+                      <tr
+                        key={employee.name}
+                        className="text-[12px] text-[#111827]"
+                      >
+                        <td className="py-[5px] pr-2">{employee.name}</td>
+                        <td className="py-[5px]">{employee.ratingsCount}</td>
+                        <td className="py-[5px]">
+                          <PercentBadge
+                            value={employee.fiveStarPercent}
+                            tone="green"
+                          />
+                        </td>
+                        <td className="py-[5px]">
+                          <PercentBadge
+                            value={employee.fourStarPercent}
+                            tone="yellow"
+                          />
+                        </td>
+                        <td className="py-[5px]">
+                          <PercentBadge
+                            value={employee.threeStarPercent}
+                            tone="red"
+                          />
+                        </td>
+                        <td className="py-[5px]">
+                          <PercentBadge
+                            value={employee.twoStarPercent}
+                            tone="red"
+                          />
+                        </td>
+                        <td className="py-[5px]">
+                          <PercentBadge
+                            value={employee.oneStarPercent}
+                            tone="red"
+                          />
+                        </td>
+                        <td className="py-[5px]">
+                          {employee.avgRating.toFixed(1)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+
+            <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
+              <div className="mb-3 text-[14px] font-medium text-[#111827]">
+                Динамика NPS
+              </div>
+
+              {dashboard.npsLarge.length === 0 ? (
+                <EmptyState text="Нет данных по NPS" />
+              ) : (
+                <LargeBarChart
+                  values={dashboard.npsLarge.map((item) => item.nps)}
+                />
+              )}
+            </section>
+          </div>
+
+          <aside className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
+            <div className="mb-3 text-[14px] font-medium text-[#111827]">
               Новые отзывы
             </div>
-            <div className="h-8 w-8 rounded-full bg-black/5" />
-          </div>
 
-          <div className="space-y-3 max-h-[calc(100vh-220px)] overflow-y-auto pr-0.5">
-            {reviewsLoading ? (
-              [...Array(3)].map((_, i) => <ReviewSkeleton key={i} />)
-            ) : reviews.length === 0 ? (
-              <p className="text-[13px] text-[#9CA3AF]">
-                Нет отзывов за выбранный период
-              </p>
-            ) : (
-              reviews.map((r) => (
-                <div
-                  key={r.id}
-                  className="rounded-xl border border-black/5 p-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] font-medium text-[#111827] truncate">
-                      {r.reviewerName || "Аноним"}
-                    </span>
-                    <span className="text-[12px] text-[#6B7280] shrink-0">
-                      ★ {r.rating}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[12px] text-[#6B7280] line-clamp-2">
-                    {r.text || "Без текста"}
-                  </p>
-                  <div className="mt-2 text-[11px] text-[#9CA3AF]">
-                    {r.platform}
-                    {r.publishedAt
-                      ? ` · ${new Date(r.publishedAt).toLocaleDateString(
-                          "ru-RU"
-                        )}`
-                      : ""}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+            <div className="max-h-[calc(100vh-215px)] space-y-4 overflow-y-auto pr-1">
+              {dashboard.recentReviews.length === 0 ? (
+                <EmptyState text="Нет отзывов за выбранный период" />
+              ) : (
+                dashboard.recentReviews.map((review) => (
+                  <article key={review.id}>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+                      <span className="font-medium text-[#111827]">
+                        {review.reviewerName || "Аноним"}
+                      </span>
+                      <span className="text-[#A3A3A3]">
+                        {review.publishedAt
+                          ? new Date(review.publishedAt).toLocaleDateString(
+                              "ru-RU"
+                            )
+                          : ""}
+                      </span>
+                      <span className="ml-auto text-[#6B7280] underline underline-offset-2">
+                        {review.platformLabel}
+                      </span>
+                      <ReviewStars rating={review.rating} />
+                    </div>
+
+                    <p className="mt-1 text-[12px] leading-[15px] text-[#111827]">
+                      {review.text || "Без текста"}
+                    </p>
+                  </article>
+                ))
+              )}
+            </div>
+          </aside>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({
-  value,
-  label1,
-  label2,
-  color,
-}: {
-  value?: number | null;
-  label1: string;
-  label2: string;
-  color: string;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <div className="text-[22px] font-bold leading-none" style={{ color }}>
-        {value ?? "—"}
-      </div>
-      <div className="text-[12px] leading-[14px] text-[#111827]">
-        <div>{label1}</div>
-        <div>{label2}</div>
-      </div>
-    </div>
-  );
-}
-
-function ReviewSkeleton() {
-  return (
-    <div className="rounded-xl border border-black/5 p-3">
-      <div className="h-4 w-36 rounded bg-black/5" />
-      <div className="mt-2 h-3 w-full rounded bg-black/5" />
-      <div className="mt-1.5 h-3 w-4/5 rounded bg-black/5" />
-      <div className="mt-3 h-3 w-20 rounded bg-black/5" />
+      )}
     </div>
   );
 }

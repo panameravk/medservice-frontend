@@ -1,7 +1,7 @@
 export type Period = "week" | "30" | "90" | "year";
 
-export const toMidnight = (d: Date) =>
-  new Date(d.getFullYear(), d.getMonth(), d.getDate());
+export const toMidnight = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
 export const formatDate = (date: Date) => {
   const dd = String(date.getDate()).padStart(2, "0");
@@ -10,38 +10,45 @@ export const formatDate = (date: Date) => {
   return `${dd}.${mm}.${yyyy}`;
 };
 
-export const addDays = (d: Date, days: number) => {
-  const x = new Date(d);
-  x.setDate(x.getDate() + days);
-  return x;
+export const addDays = (date: Date, days: number) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
 };
 
-export const addYears = (d: Date, years: number) => {
-  const x = new Date(d);
-  x.setFullYear(x.getFullYear() + years);
-  return x;
+export const addYears = (date: Date, years: number) => {
+  const next = new Date(date);
+  next.setFullYear(next.getFullYear() + years);
+  return next;
 };
 
-export const getDateRangeByPeriod = (p: Period) => {
-  const start = toMidnight(new Date()); // сегодня
-  let end: Date;
+export const getDateRangeByPeriod = (
+  p: Period,
+  baseDate: Date = new Date()
+) => {
+  const end = toMidnight(baseDate);
+  let start: Date;
 
   switch (p) {
     case "week":
-      end = addDays(start, 6);
+      start = addDays(end, -6);
       break;
     case "30":
-      end = addDays(start, 29);
+      start = addDays(end, -29);
       break;
     case "90":
-      end = addDays(start, 89);
+      start = addDays(end, -89);
       break;
     case "year":
-      end = addDays(addYears(start, 1), -1);
+      start = addYears(end, -1);
       break;
     default:
-      end = start;
+      start = end;
   }
 
-  return { start, end, label: `${formatDate(start)} - ${formatDate(end)}` };
+  return {
+    start,
+    end,
+    label: `${formatDate(end)} - ${formatDate(start)}`,
+  };
 };

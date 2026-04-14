@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useBranchesStore } from "../../../lib/branchesStore";
 import { updateBranch } from "../../../lib/api";
+import { useBranchesStore } from "../../../lib/branchesStore";
 
 function uniqLower(arr: string[]): string[] {
   return Array.from(
-    new Set(arr.map((e) => e.trim().toLowerCase()).filter(Boolean))
+    new Set(arr.map((email) => email.trim().toLowerCase()).filter(Boolean))
   );
 }
 
@@ -14,15 +14,15 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-function IconTrash() {
+function TrashIcon() {
   return (
     <svg
-      width="14"
-      height="14"
+      width="13"
+      height="13"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
@@ -40,36 +40,39 @@ function EmailSection({
 }: {
   label: string;
   emails: string[];
-  onChange: (v: string[]) => void;
+  onChange: (value: string[]) => void;
 }) {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const add = () => {
-    const val = input.trim().toLowerCase();
-    if (!val) return;
-    if (!isValidEmail(val)) {
+    const value = input.trim().toLowerCase();
+
+    if (!value) return;
+
+    if (!isValidEmail(value)) {
       setError("Неверный формат email");
       return;
     }
-    if (emails.includes(val)) {
+
+    if (emails.includes(value)) {
       setError("Уже добавлен");
       return;
     }
-    onChange([...emails, val]);
+
+    onChange([...emails, value]);
     setInput("");
     setError(null);
   };
 
   return (
-    <div className="space-y-3">
-      <label className="block text-[13px] font-medium text-[#111827]">
+    <div className="space-y-2">
+      <label className="block text-[13px] font-medium text-[#222222]">
         {label}
       </label>
 
-      {/* Input + Добавить */}
-      <div className="flex gap-3 items-start">
-        <div className="flex-1">
+      <div className="flex items-start gap-3">
+        <div className="w-full max-w-[410px]">
           <input
             type="email"
             value={input}
@@ -77,41 +80,45 @@ function EmailSection({
               setInput(e.target.value);
               setError(null);
             }}
-            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), add())}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
             className={[
-              "w-full h-11 bg-[#F3F4F6] border rounded-[10px] px-4 text-[13px]",
-              "text-[#111827] placeholder-[#9CA3AF] focus:outline-none transition-colors",
-              error
-                ? "border-red-400"
-                : "border-transparent focus:border-[#F4C21A]",
+              "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none transition",
+              error ? "border-red-400" : "focus:border-[#D8D8D8]",
             ].join(" ")}
           />
-          {error && <p className="mt-1 text-[11px] text-red-500">{error}</p>}
+          {error && <p className="mt-1 text-[12px] text-red-500">{error}</p>}
         </div>
+
         <button
           type="button"
           onClick={add}
-          className="h-11 px-6 rounded-[10px] bg-[#F4C21A] hover:bg-yellow-300 active:brightness-90 text-[13px] font-semibold text-[#111827] transition-colors shrink-0"
+          className="h-[46px] min-w-[165px] rounded-[10px] bg-[#F4C21A] px-6 text-[14px] font-medium text-[#111827] transition hover:bg-yellow-300"
         >
           Добавить
         </button>
       </div>
 
-      {/* Email chips */}
       {emails.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 pt-1">
           {emails.map((email) => (
             <div
               key={email}
-              className="flex items-center gap-2 border border-[#E5E7EB] rounded-[8px] px-3 py-1.5"
+              className="flex h-[26px] items-center gap-2 rounded-[8px] border border-[#D8D8D8] bg-white pl-3 pr-2"
             >
-              <span className="text-[13px] text-[#6B7280]">{email}</span>
+              <span className="text-[12px] text-[#9A9A9A]">{email}</span>
               <button
                 type="button"
-                onClick={() => onChange(emails.filter((e) => e !== email))}
-                className="text-[#9CA3AF] hover:text-red-500 transition-colors"
+                onClick={() =>
+                  onChange(emails.filter((item) => item !== email))
+                }
+                className="text-[#A2A2A2] transition hover:text-red-500"
               >
-                <IconTrash />
+                <TrashIcon />
               </button>
             </div>
           ))}
@@ -123,7 +130,7 @@ function EmailSection({
 
 export default function NotificationsPage() {
   const selectedBranch = useBranchesStore((s) =>
-    s.branches.find((b) => b.id === s.selectedBranchId)
+    s.branches.find((branch) => branch.id === s.selectedBranchId)
   );
   const updateBranchInStore = useBranchesStore((s) => s.updateBranchInStore);
 
@@ -138,36 +145,45 @@ export default function NotificationsPage() {
     setReminderEmails(selectedBranch?.reminderEmails ?? []);
     setSaved(false);
     setSaveError(null);
-  }, [selectedBranch?.id]);
+  }, [
+    selectedBranch?.id,
+    selectedBranch?.complaintEmails,
+    selectedBranch?.reminderEmails,
+  ]);
 
   const handleSave = async () => {
     if (!selectedBranch?.id) return;
+
     setSaving(true);
     setSaveError(null);
     setSaved(false);
+
     try {
       const updated = await updateBranch(selectedBranch.id, {
         complaintEmails: uniqLower(complaintEmails),
         reminderEmails: uniqLower(reminderEmails),
       });
+
       updateBranchInStore(updated);
       setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    } catch (e: unknown) {
-      setSaveError(e instanceof Error ? e.message : "Ошибка сохранения");
+      window.setTimeout(() => setSaved(false), 2500);
+    } catch (error: unknown) {
+      setSaveError(
+        error instanceof Error ? error.message : "Ошибка сохранения"
+      );
     } finally {
       setSaving(false);
     }
   };
 
   if (!selectedBranch) {
-    return <p className="text-[13px] text-[#9CA3AF] p-6">Выберите филиал</p>;
+    return <p className="text-[14px] text-[#9CA3AF]">Выберите филиал</p>;
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <EmailSection
-        label="Email для  перехваченных жалоб"
+        label="Email для перехваченных жалоб"
         emails={complaintEmails}
         onChange={setComplaintEmails}
       />
@@ -182,9 +198,9 @@ export default function NotificationsPage() {
 
       <button
         type="button"
-        onClick={handleSave}
+        onClick={() => void handleSave()}
         disabled={saving}
-        className="h-12 w-[280px] rounded-[10px] bg-[#F4C21A] hover:bg-yellow-300 active:brightness-90 disabled:opacity-60 text-[14px] font-semibold text-[#111827] transition"
+        className="h-11 w-[280px] rounded-[10px] bg-[#F4C21A] text-[14px] font-medium text-[#111827] transition hover:bg-yellow-300 disabled:opacity-60"
       >
         {saving ? "Сохранение..." : saved ? "Сохранено ✓" : "Сохранить"}
       </button>

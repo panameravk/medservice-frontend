@@ -3,44 +3,69 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { authApi, getAccessToken } from "../../lib/api";
+import { ApiError, authApi, getAccessToken } from "../../lib/api";
+import { useBranchesStore } from "../../lib/branchesStore";
 
 export default function LoginPage() {
   const router = useRouter();
+  const resetBranchesStore = useBranchesStore((s) => s.reset);
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const token = getAccessToken();
+    let cancelled = false;
 
-    if (!token) {
-      setChecking(false);
-      return;
-    }
+    const checkSession = async () => {
+      const token = getAccessToken();
 
-    authApi
-      .me()
-      .then(() => {
+      if (!token) {
+        if (!cancelled) setChecking(false);
+        return;
+      }
+
+      try {
+        await authApi.me();
+
+        if (cancelled) return;
         router.replace("/branches");
-      })
-      .catch(() => {
-        setChecking(false);
-      });
-  }, [router]);
+      } catch {
+        if (cancelled) return;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+        authApi.logout();
+        resetBranchesStore();
+        setChecking(false);
+      }
+    };
+
+    void checkSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resetBranchesStore, router]);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
     setError(null);
     setLoading(true);
 
     try {
-      await authApi.login(username, password);
-      router.push("/branches");
-    } catch (err: unknown) {
-      setError((err as Error).message);
+      await authApi.login(username.trim(), password);
+      router.replace("/branches");
+    } catch (error: unknown) {
+      if (error instanceof ApiError) {
+        setError(error.message);
+      } else if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("Не удалось выполнить вход");
+      }
     } finally {
       setLoading(false);
     }
@@ -59,18 +84,22 @@ export default function LoginPage() {
           type="text"
           placeholder="Логин"
           value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          onChange={(event) => setUsername(event.target.value)}
+          autoComplete="username"
           required
-          className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-sm outline-none focus:bg-white"
+          disabled={loading}
+          className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-sm outline-none focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
         />
 
         <input
           type="password"
           placeholder="Пароль"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(event) => setPassword(event.target.value)}
+          autoComplete="current-password"
           required
-          className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-sm outline-none focus:bg-white"
+          disabled={loading}
+          className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-sm outline-none focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
         />
 
         {error && <p className="text-sm text-red-500">{error}</p>}
@@ -79,7 +108,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-[170px] rounded-[10px] bg-yellow-400 py-3 text-sm font-semibold text-black hover:bg-yellow-300 disabled:opacity-60"
+            className="w-[170px] rounded-[10px] bg-yellow-400 py-3 text-sm font-semibold text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "Вход..." : "Войти"}
           </button>
