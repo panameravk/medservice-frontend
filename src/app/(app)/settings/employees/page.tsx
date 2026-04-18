@@ -124,6 +124,13 @@ export default function EmployeesPage() {
   const remove = async (id: number) => {
     setError(null);
 
+    if (typeof window !== "undefined") {
+      const target = items.find((item) => item.id === id);
+      const name = target?.name ? `«${target.name}»` : "этого сотрудника";
+      const confirmed = window.confirm(`Удалить ${name}? Действие необратимо.`);
+      if (!confirmed) return;
+    }
+
     try {
       await employeesApi.delete(id);
       setItems((prev) => prev.filter((item) => item.id !== id));

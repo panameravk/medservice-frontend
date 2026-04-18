@@ -175,6 +175,13 @@ function BlacklistContent({ branchId }: { branchId: string }) {
   const handleDelete = async (id: number) => {
     setDeleteError(null);
 
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(
+        "Удалить запись из чёрного списка? Действие необратимо."
+      );
+      if (!confirmed) return;
+    }
+
     try {
       await blacklistApi.delete(id);
       setEntries((prev) => prev.filter((entry) => entry.id !== id));
@@ -233,7 +240,7 @@ function BlacklistContent({ branchId }: { branchId: string }) {
               editingId === entry.id ? (
                 <div
                   key={entry.id}
-                  className="grid grid-cols-[1fr_1fr_1.6fr_2.4fr_64px] items-center gap-3 border-t border-black/5 bg-white px-6 py-3"
+                  className="grid grid-cols-[1fr_1fr_1.6fr_2.4fr_auto] items-center gap-3 border-t border-black/5 bg-white px-6 py-3"
                 >
                   <input
                     value={editForm.lastName ?? ""}

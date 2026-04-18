@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Brand } from "../Brand";
 
 const nav = [
@@ -65,6 +65,7 @@ function NavIcon({ type }: { type: "building" | "gift" | "settings" }) {
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <aside className="min-h-screen w-[232px] border-r border-black/5 bg-white">
@@ -103,6 +104,7 @@ export function AdminSidebar() {
         <div className="mt-14">
           <button
             type="button"
+            onClick={() => router.push("/admin/branches?create=1")}
             className="flex h-[48px] w-[182px] items-center justify-center rounded-[10px] bg-black text-[14px] font-semibold text-white transition hover:opacity-90"
           >
             Создать филиал

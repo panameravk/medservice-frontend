@@ -21,6 +21,7 @@ export interface ReviewRequest {
   publishedAt: string | null;
   rating: number | null;
   platform: string | null;
+  reviewUrl: string | null;
 }
 
 export async function getRequests(params: {

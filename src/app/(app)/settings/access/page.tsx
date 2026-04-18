@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Switch } from "../../../components/ui/Switch";
+import { useBranchesStore } from "../../../lib/branchesStore";
 
 interface TeamMember {
   id: string;
@@ -11,62 +13,35 @@ interface TeamMember {
 }
 
 const ROLES = ["Руководитель", "Специалист", "Гость"] as const;
-const STORAGE_KEY = "team_members";
+const STORAGE_KEY_PREFIX = "team_members_branch_";
 
 type SelectOption = {
   label: string;
   value: string;
 };
 
-const DEFAULT_MEMBERS: TeamMember[] = [
-  {
-    id: "1",
-    fullName: "Байков Даниил Владимирович",
-    role: "Руководитель",
-    email: "primer@ya.ru",
-    phone: "+7 999 333 22 11",
-  },
-  {
-    id: "2",
-    fullName: "Михайлов Павел Павлович",
-    role: "Специалист",
-    email: "primer@ya.ru",
-    phone: "+7 999 333 22 11",
-  },
-  {
-    id: "3",
-    fullName: "Михайлов Павел Павлович",
-    role: "Гость",
-    email: "primer@ya.ru",
-    phone: "+7 999 333 22 11",
-  },
-];
+function storageKey(branchId: string) {
+  return `${STORAGE_KEY_PREFIX}${branchId}`;
+}
 
-function loadMembers(): TeamMember[] {
-  if (typeof window === "undefined") return DEFAULT_MEMBERS;
-
+function loadMembers(branchId: string): TeamMember[] {
+  if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as TeamMember[]) : DEFAULT_MEMBERS;
+    const raw = localStorage.getItem(storageKey(branchId));
+    return raw ? (JSON.parse(raw) as TeamMember[]) : [];
   } catch {
-    return DEFAULT_MEMBERS;
+    return [];
   }
 }
 
-function saveMembers(members: TeamMember[]) {
+function saveMembers(branchId: string, members: TeamMember[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
+  localStorage.setItem(storageKey(branchId), JSON.stringify(members));
 }
 
 function ChevronDown({ className = "" }: { className?: string }) {
   return (
-    <svg
-      className={className}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none">
       <path
         d="M6 9l6 6 6-6"
         stroke="currentColor"
@@ -88,11 +63,20 @@ function CustomSelect({
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const selected = options.find((item) => item.value === value) ?? options[0];
 
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
   return (
-    <div className="relative">
+    <div ref={rootRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
@@ -117,7 +101,6 @@ function CustomSelect({
           <div className="max-h-[240px] overflow-y-auto">
             {options.map((option) => {
               const active = option.value === value;
-
               return (
                 <button
                   key={option.value}
@@ -146,16 +129,7 @@ function CustomSelect({
 
 function IconEdit() {
   return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
@@ -164,16 +138,7 @@ function IconEdit() {
 
 function IconTrash() {
   return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="3 6 5 6 21 6" />
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
       <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
@@ -199,48 +164,40 @@ function MemberModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-[420px] rounded-[16px] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)] space-y-4">
+      <div className="w-full max-w-[420px] space-y-4 rounded-[16px] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)]">
         <div>
-          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
-            ФИО
-          </label>
+          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">ФИО</label>
           <input
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="w-full h-11 rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
+            className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
             placeholder="Иванов Иван Иванович"
           />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
-            Роль в команде
-          </label>
+          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">Роль в команде</label>
           <CustomSelect value={role} options={roleOptions} onChange={setRole} />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
-            Email
-          </label>
+          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">Email</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full h-11 rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
+            className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
             placeholder="email@example.com"
           />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
-            Телефон
-          </label>
+          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">Телефон</label>
           <input
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="w-full h-11 rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
+            className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
             placeholder="+7 999 000 00 00"
           />
         </div>
@@ -275,43 +232,43 @@ function MemberModal({
 }
 
 export default function AccessPage() {
-  const [members, setMembers] = useState<TeamMember[]>(() => loadMembers());
+  const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
 
+  useEffect(() => {
+    if (!selectedBranchId) {
+      setMembers([]);
+      return;
+    }
+    setMembers(loadMembers(selectedBranchId));
+  }, [selectedBranchId]);
+
   const persist = (next: TeamMember[]) => {
+    if (!selectedBranchId) return;
     setMembers(next);
-    saveMembers(next);
+    saveMembers(selectedBranchId, next);
   };
 
   const handleSave = (data: Omit<TeamMember, "id"> & { id?: string }) => {
     if (data.id) {
-      persist(
-        members.map((member) =>
-          member.id === data.id ? { ...member, ...data } : member
-        )
-      );
+      persist(members.map((m) => (m.id === data.id ? { ...m, ...data } : m)));
     } else {
       persist([...members, { ...data, id: String(Date.now()) } as TeamMember]);
     }
-
     setModalOpen(false);
     setEditing(null);
   };
 
   const handleDelete = (id: string) => {
-    persist(members.filter((member) => member.id !== id));
+    if (!window.confirm("Удалить участника? Действие необратимо.")) return;
+    persist(members.filter((m) => m.id !== id));
   };
 
-  const openEdit = (member: TeamMember) => {
-    setEditing(member);
-    setModalOpen(true);
-  };
-
-  const openCreate = () => {
-    setEditing(null);
-    setModalOpen(true);
-  };
+  if (!selectedBranchId) {
+    return <p className="text-[14px] text-[#9CA3AF]">Выберите филиал</p>;
+  }
 
   return (
     <div className="space-y-5 p-6">
@@ -335,22 +292,17 @@ export default function AccessPage() {
                 key={member.id}
                 className="grid grid-cols-[1.6fr_1fr_1fr_1fr_64px] items-center px-6 py-4 transition-colors hover:bg-[#FAFAFA]"
               >
-                <span className="text-[13px] text-[#111827]">
-                  {member.fullName}
-                </span>
-                <span className="text-[13px] text-[#6B7280]">
-                  {member.role}
-                </span>
-                <span className="text-[13px] text-[#6B7280]">
-                  {member.email}
-                </span>
-                <span className="text-[13px] text-[#6B7280]">
-                  {member.phone}
-                </span>
+                <span className="text-[13px] text-[#111827]">{member.fullName}</span>
+                <span className="text-[13px] text-[#6B7280]">{member.role}</span>
+                <span className="text-[13px] text-[#6B7280]">{member.email}</span>
+                <span className="text-[13px] text-[#6B7280]">{member.phone}</span>
                 <div className="flex items-center justify-end gap-3">
                   <button
                     type="button"
-                    onClick={() => openEdit(member)}
+                    onClick={() => {
+                      setEditing(member);
+                      setModalOpen(true);
+                    }}
                     className="text-[#9CA3AF] transition-colors hover:text-[#111827]"
                     title="Редактировать"
                   >
@@ -373,7 +325,10 @@ export default function AccessPage() {
 
       <button
         type="button"
-        onClick={openCreate}
+        onClick={() => {
+          setEditing(null);
+          setModalOpen(true);
+        }}
         className="h-12 rounded-[10px] bg-[#F4C21A] px-8 text-[13px] font-medium text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90"
       >
         Выдать доступ к филиалу

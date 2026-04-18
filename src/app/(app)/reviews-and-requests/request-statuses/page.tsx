@@ -172,10 +172,7 @@ function StatusIndicator({
 }
 
 function PlatformBadge({ request }: { request: ReviewRequest }) {
-  const reviewUrl =
-    "reviewUrl" in request && typeof request.reviewUrl === "string"
-      ? request.reviewUrl
-      : "";
+  const reviewUrl = request.reviewUrl ?? "";
 
   if (request.platform === "complaint") {
     const content = (

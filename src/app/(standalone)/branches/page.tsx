@@ -166,7 +166,7 @@ export default function BranchesPage() {
 
   const toISODate = (d: Date) => d.toISOString().slice(0, 10);
 
-  const [activePreset, setActivePreset] = useState<Period>("30");
+  const [activePreset, setActivePreset] = useState<Period | null>("30");
 
   const initialRange = getDateRangeByPeriod("30");
   const [dateFrom, setDateFrom] = useState(() => toISODate(initialRange.start));
