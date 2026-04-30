@@ -45,9 +45,6 @@ export function middleware(request: NextRequest) {
   const userPublicPath = isUserPublicPath(pathname);
 
   if (!userToken) {
-    if (adminToken) {
-      return NextResponse.redirect(new URL(ADMIN_HOME, request.url));
-    }
     if (userPublicPath) {
       return NextResponse.next();
     }

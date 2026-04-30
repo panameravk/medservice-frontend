@@ -66,8 +66,8 @@ export const adminAuthApi = {
       throw new ApiError("Доступ только для администраторов", 403, data);
     }
 
-    clearTokens("user");
     setTokens(data.accessToken, "admin");
+    setTokens(data.accessToken, "user");
     return data;
   },
 
