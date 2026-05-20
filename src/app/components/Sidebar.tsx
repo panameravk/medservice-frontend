@@ -24,7 +24,7 @@ const nav = [
   {
     href: "/bonuses",
     label: "Бонусы",
-    icon: "/Icons/heart_logo.svg",
+    icon: "/Icons/gift_logo.svg",
   },
   {
     href: "/settings/branch",
