@@ -7,10 +7,15 @@ import { Brand } from "../Brand";
 const nav = [
   { href: "/admin/branches", label: "Филиалы", icon: "building" },
   { href: "/admin/bonuses", label: "Бонусы", icon: "gift" },
+  { href: "/admin/faq", label: "FAQ", icon: "help" },
   { href: "/admin/access", label: "Доступы", icon: "settings" },
 ];
 
-function NavIcon({ type }: { type: "building" | "gift" | "settings" }) {
+function NavIcon({
+  type,
+}: {
+  type: "building" | "gift" | "settings" | "help";
+}) {
   if (type === "building") {
     return (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -27,6 +32,21 @@ function NavIcon({ type }: { type: "building" | "gift" | "settings" }) {
           strokeWidth="2"
           strokeLinecap="round"
         />
+      </svg>
+    );
+  }
+
+  if (type === "help") {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+        <path
+          d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-1.5 2-2.5 2.5V14"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <circle cx="12" cy="17" r="1" fill="currentColor" />
       </svg>
     );
   }
@@ -92,7 +112,9 @@ export function AdminSidebar() {
               >
                 <span className="text-[#202330]">
                   <NavIcon
-                    type={item.icon as "building" | "gift" | "settings"}
+                    type={
+                      item.icon as "building" | "gift" | "settings" | "help"
+                    }
                   />
                 </span>
                 {item.label}
