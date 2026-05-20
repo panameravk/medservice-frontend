@@ -2,6 +2,7 @@ export interface Branding {
   publicName: string | null;
   publicCity: string | null;
   logoUrl: string | null;
+  websiteUrl: string | null;
 }
 
 export interface BranchBonus {
@@ -10,8 +11,9 @@ export interface BranchBonus {
   isPublished: boolean;
   discountPercent: number;
   description: string;
-  startDate: string; // ISO yyyy-mm-dd
+  startDate: string;
   endDate: string;
+  promoCode: string | null;
 }
 
 export interface BranchBonusInput {
@@ -20,6 +22,7 @@ export interface BranchBonusInput {
   startDate: string;
   endDate: string;
   isPublished?: boolean;
+  promoCode?: string | null;
 }
 
 export interface AdminBonus {
@@ -33,6 +36,8 @@ export interface AdminBonus {
   description: string;
   startDate: string;
   endDate: string;
+  promoCode: string | null;
+  websiteUrl: string | null;
 }
 
 export interface AdminBonusInput {
@@ -44,6 +49,8 @@ export interface AdminBonusInput {
   startDate: string;
   endDate: string;
   isPublished?: boolean;
+  promoCode?: string | null;
+  websiteUrl?: string | null;
 }
 
 export interface BonusCategory {
