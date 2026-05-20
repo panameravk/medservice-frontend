@@ -75,17 +75,21 @@ function BonusesScreen({ branchId }: { branchId: number }) {
   };
 
   const togglePublished = async (bonus: BranchBonus) => {
-    const optimistic = bonuses.map((b) =>
-      b.id === bonus.id ? { ...b, isPublished: !b.isPublished } : b
+    const nextValue = !bonus.isPublished;
+    setBonuses((prev) =>
+      prev.map((b) => (b.id === bonus.id ? { ...b, isPublished: nextValue } : b))
     );
-    setBonuses(optimistic);
     try {
       const updated = await updateBranchBonus(branchId, bonus.id, {
-        isPublished: !bonus.isPublished,
+        isPublished: nextValue,
       });
       setBonuses((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
     } catch (e) {
-      setBonuses(bonuses); // rollback
+      setBonuses((prev) =>
+        prev.map((b) =>
+          b.id === bonus.id ? { ...b, isPublished: bonus.isPublished } : b
+        )
+      );
       setError(e instanceof Error ? e.message : "Ошибка");
     }
   };
@@ -262,6 +266,12 @@ function BrandingCard({
 }) {
   const [publicName, setPublicName] = useState(value.publicName ?? "");
   const [publicCity, setPublicCity] = useState(value.publicCity ?? "");
+
+  useEffect(() => {
+    setPublicName(value.publicName ?? "");
+    setPublicCity(value.publicCity ?? "");
+  }, [value.publicName, value.publicCity]);
+
   const inputCls =
     "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition";
 
