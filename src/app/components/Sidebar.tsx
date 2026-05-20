@@ -22,6 +22,11 @@ const nav = [
     icon: "/Icons/heart_logo.svg",
   },
   {
+    href: "/bonuses",
+    label: "Бонусы",
+    icon: "/Icons/heart_logo.svg",
+  },
+  {
     href: "/settings/branch",
     label: "Настройки",
     icon: "/Icons/settings_sidebar.svg",
