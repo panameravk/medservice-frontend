@@ -266,11 +266,13 @@ function BrandingCard({
 }) {
   const [publicName, setPublicName] = useState(value.publicName ?? "");
   const [publicCity, setPublicCity] = useState(value.publicCity ?? "");
+  const [websiteUrl, setWebsiteUrl] = useState(value.websiteUrl ?? "");
 
   useEffect(() => {
     setPublicName(value.publicName ?? "");
     setPublicCity(value.publicCity ?? "");
-  }, [value.publicName, value.publicCity]);
+    setWebsiteUrl(value.websiteUrl ?? "");
+  }, [value.publicName, value.publicCity, value.websiteUrl]);
 
   const inputCls =
     "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition";
@@ -283,7 +285,7 @@ function BrandingCard({
 
   return (
     <div className="rounded-[14px] border border-[#E6E6E6] bg-white px-5 py-4">
-      <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div>
           <label className="mb-2 block text-[13px] font-medium text-[#222222]">
             Публичное название компании для пациентов
@@ -315,6 +317,18 @@ function BrandingCard({
             onChange={(next) => onSave({ logoUrl: next })}
           />
         </div>
+        <div>
+          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+            Ссылка на сайт клиники
+          </label>
+          <input
+            value={websiteUrl}
+            onChange={(e) => setWebsiteUrl(e.target.value)}
+            onBlur={() => commit("websiteUrl", websiteUrl)}
+            placeholder="https://example.ru"
+            className={inputCls}
+          />
+        </div>
       </div>
     </div>
   );
@@ -337,6 +351,7 @@ function BonusModal({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate] = useState(initial?.endDate ?? "");
+  const [promoCode, setPromoCode] = useState(initial?.promoCode ?? "");
 
   const canSave =
     description.trim().length > 0 &&
@@ -376,6 +391,18 @@ function BonusModal({
           />
         </div>
 
+        <div>
+          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+            Промокод
+          </label>
+          <input
+            value={promoCode}
+            onChange={(e) => setPromoCode(e.target.value)}
+            placeholder="Например, SuperSkidka"
+            className="h-[46px] w-full rounded-[10px] bg-[#F3F4F6] px-3 text-[14px] outline-none"
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-2 block text-[13px] font-medium text-[#222222]">
@@ -410,6 +437,7 @@ function BonusModal({
               description: description.trim(),
               startDate,
               endDate,
+              promoCode: promoCode.trim() || null,
             })
           }
           className="mt-2 h-[48px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"

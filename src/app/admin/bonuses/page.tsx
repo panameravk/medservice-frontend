@@ -350,6 +350,8 @@ function AdminBonusModal({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate] = useState(initial?.endDate ?? "");
+  const [promoCode, setPromoCode] = useState(initial?.promoCode ?? "");
+  const [siteUrl, setSiteUrl] = useState(initial?.websiteUrl ?? "");
 
   const canSave =
     companyName.trim().length > 0 &&
@@ -396,6 +398,18 @@ function AdminBonusModal({
 
         <div>
           <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+            Ссылка на сайт партнёра
+          </label>
+          <input
+            value={siteUrl}
+            onChange={(e) => setSiteUrl(e.target.value)}
+            placeholder="https://example.ru"
+            className={inputCls}
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
             Размер скидки (%)
           </label>
           <select
@@ -409,6 +423,18 @@ function AdminBonusModal({
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+            Промокод
+          </label>
+          <input
+            value={promoCode}
+            onChange={(e) => setPromoCode(e.target.value)}
+            placeholder="Например, SuperApteka"
+            className={inputCls}
+          />
         </div>
 
         <div>
@@ -460,6 +486,8 @@ function AdminBonusModal({
               description: description.trim(),
               startDate,
               endDate,
+              promoCode: promoCode.trim() || null,
+              websiteUrl: siteUrl.trim() || null,
             })
           }
           className="mt-2 h-[48px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] disabled:opacity-50"
