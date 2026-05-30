@@ -28,11 +28,16 @@ export const authApi = {
     }
 
     if (data.user.isSuperuser) {
-      throw new ApiError("Неверный логин или пароль", 401, data);
+      // Admin logging in from the shared /login page: establish both sessions
+      // (same dual-session behavior adminAuthApi.login uses) so middleware that
+      // gates /admin/* on the admin_token cookie lets them through.
+      setTokens(data.accessToken, "admin");
+      setTokens(data.accessToken, "user");
+    } else {
+      clearTokens("admin");
+      setTokens(data.accessToken, "user");
     }
 
-    clearTokens("admin");
-    setTokens(data.accessToken, "user");
     return data;
   },
 

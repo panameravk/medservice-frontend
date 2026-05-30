@@ -39,7 +39,7 @@ export default function BonusesPage() {
     );
   }
 
-  return <BonusesScreen branchId={numericBranchId} />;
+  return <BonusesScreen key={numericBranchId} branchId={numericBranchId} />;
 }
 
 function BonusesScreen({ branchId }: { branchId: number }) {
@@ -267,12 +267,6 @@ function BrandingCard({
   const [publicName, setPublicName] = useState(value.publicName ?? "");
   const [publicCity, setPublicCity] = useState(value.publicCity ?? "");
   const [websiteUrl, setWebsiteUrl] = useState(value.websiteUrl ?? "");
-
-  useEffect(() => {
-    setPublicName(value.publicName ?? "");
-    setPublicCity(value.publicCity ?? "");
-    setWebsiteUrl(value.websiteUrl ?? "");
-  }, [value.publicName, value.publicCity, value.websiteUrl]);
 
   const inputCls =
     "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition";

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Switch } from "../../../components/ui/Switch";
 import { ApiError, employeesApi, type Employee } from "../../../lib/api";
 import { useBranchesStore } from "../../../lib/branchesStore";
+import { safeUrl } from "../../../lib/url";
 
 function TrashIcon() {
   return (
@@ -279,17 +280,27 @@ export default function EmployeesPage() {
                       <span className="text-[13px] text-[#9CA3AF]">—</span>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {employee.profiles.map((url, index) => (
-                          <a
-                            key={`${employee.id}-${index}`}
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-full border border-[#E5E7EB] px-3 py-1 text-[12px] text-[#111827] hover:bg-[#F3F4F6]"
-                          >
-                            {url}
-                          </a>
-                        ))}
+                        {employee.profiles.map((url, index) => {
+                          const safe = safeUrl(url);
+                          return safe ? (
+                            <a
+                              key={`${employee.id}-${index}`}
+                              href={safe}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-full border border-[#E5E7EB] px-3 py-1 text-[12px] text-[#111827] hover:bg-[#F3F4F6]"
+                            >
+                              {url}
+                            </a>
+                          ) : (
+                            <span
+                              key={`${employee.id}-${index}`}
+                              className="rounded-full border border-[#E5E7EB] px-3 py-1 text-[12px] text-[#9CA3AF]"
+                            >
+                              {url}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
                   </td>

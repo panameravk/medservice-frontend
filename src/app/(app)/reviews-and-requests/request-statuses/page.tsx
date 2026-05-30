@@ -7,6 +7,7 @@ import {
   type RequestStatus,
 } from "../../../lib/api";
 import { useBranchesStore } from "../../../lib/branchesStore";
+import { safeUrl } from "../../../lib/url";
 
 const STATUS_TABS: { label: string; value: RequestStatus | undefined }[] = [
   { label: "Все запросы", value: undefined },
@@ -203,9 +204,10 @@ function PlatformBadge({ request }: { request: ReviewRequest }) {
     </span>
   );
 
-  if (reviewUrl) {
+  const safeReviewUrl = safeUrl(reviewUrl);
+  if (safeReviewUrl) {
     return (
-      <a href={reviewUrl} target="_blank" rel="noreferrer">
+      <a href={safeReviewUrl} target="_blank" rel="noreferrer">
         {content}
       </a>
     );

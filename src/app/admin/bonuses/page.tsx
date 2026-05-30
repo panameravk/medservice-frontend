@@ -45,6 +45,7 @@ export default function AdminBonusesPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load on mount; matches existing project pattern
     void refresh();
   }, []);
 
