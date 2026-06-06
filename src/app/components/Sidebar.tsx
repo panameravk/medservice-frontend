@@ -22,6 +22,11 @@ const nav = [
     icon: "/Icons/heart_logo.svg",
   },
   {
+    href: "/bonuses",
+    label: "Бонусы",
+    icon: "/Icons/gift_base.svg",
+  },
+  {
     href: "/settings/branch",
     label: "Настройки",
     icon: "/Icons/settings_sidebar.svg",
@@ -70,7 +75,7 @@ export function Sidebar() {
         </div>
 
         <nav className="mt-6 space-y-1">
-          {nav.map((item) => {
+          {nav.map((item, i) => {
             const active =
               item.href === "/settings/branch"
                 ? pathname === "/settings/branch" || pathname.startsWith("/settings/")
@@ -80,8 +85,9 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                style={{ animationDelay: `${80 + i * 70}ms` }}
                 className={[
-                  "flex items-center gap-3 rounded-[10px] px-3 py-2 text-[16px] transition",
+                  "animate-item flex items-center gap-3 rounded-[10px] px-3 py-2 text-[16px] transition",
                   active
                     ? "bg-[#F3F4F6] font-bold text-[#111827]"
                     : "font-bold text-[#111827] hover:bg-black/5",

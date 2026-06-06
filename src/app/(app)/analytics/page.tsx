@@ -439,6 +439,21 @@ export default function AnalyticsPage() {
           type="date"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          // Native date inputs only open the calendar from the right-edge
+          // indicator, so clicking the text/icon did nothing. Open the picker
+          // programmatically on any click across the field (and suppress the
+          // native double-open). Falls back to default behaviour if unsupported.
+          onClick={(e) => {
+            const el = e.currentTarget;
+            if (typeof el.showPicker === "function") {
+              e.preventDefault();
+              try {
+                el.showPicker();
+              } catch {
+                /* showPicker can throw outside a user gesture — ignore */
+              }
+            }
+          }}
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
         />
       </div>

@@ -148,8 +148,8 @@ export default function AdminLoginPage() {
 
         <section className="relative hidden lg:block">
           <Image
-            src="/images/clinic.jpg"
-            alt="Clinic background"
+            src="/images/enter-picture.svg"
+            alt="Иллюстрация входа"
             fill
             className="object-cover"
             priority

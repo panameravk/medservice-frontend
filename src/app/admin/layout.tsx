@@ -6,6 +6,7 @@ import { Footer } from "../components/Footer";
 import { AdminGuard } from "../components/AdminGuard";
 import { AdminHeader } from "../components/admin/AdminHeader";
 import { AdminSidebar } from "../components/admin/AdminSideBar";
+import { PageTransition } from "../components/PageTransition";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -29,7 +30,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <AdminHeader />
             </header>
 
-            <div className="flex-1 px-5 py-5">{children}</div>
+            <div className="flex-1 px-5 py-5">
+              <PageTransition>{children}</PageTransition>
+            </div>
 
             <Footer />
           </div>

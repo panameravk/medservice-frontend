@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 function XIcon() {
   return (
@@ -27,6 +28,9 @@ export function AdminModal({
   widthClassName?: string;
   title?: string;
 }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -35,14 +39,22 @@ export function AdminModal({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  return (
+  // Render through a portal to <body>. The route-transition wrapper
+  // (`.animate-page`) keeps `transform: translateY(0)` after its animation
+  // (animation-fill-mode: both), and any non-`none` transform makes that element
+  // the containing block for `position: fixed` descendants — which would clip
+  // this backdrop to the content area instead of the full viewport. The portal
+  // escapes that ancestor so `fixed inset-0` covers the real viewport.
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4"
+      className="animate-overlay fixed inset-0 z-50 grid place-items-center bg-black/30 px-4"
       onClick={onClose}
     >
       <div
         className={[
-          "relative w-full rounded-[16px] border border-[#E5E7EB] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)]",
+          "animate-modal relative w-full rounded-[16px] border border-[#E5E7EB] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)]",
           widthClassName,
         ].join(" ")}
         onClick={(e) => e.stopPropagation()}
@@ -65,6 +77,7 @@ export function AdminModal({
 
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

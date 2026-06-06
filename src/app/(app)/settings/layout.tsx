@@ -9,7 +9,6 @@ const tabs = [
   { label: "Сотрудники", href: "/settings/employees" },
   { label: "Уведомления", href: "/settings/notifications" },
   { label: "Доступы", href: "/settings/access" },
-  { label: "Рассылки", href: "/settings/mailings" },
 ];
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
@@ -28,7 +27,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
 
       <div className="rounded-[14px] border border-[#E6E6E6] bg-white">
         <div className="overflow-hidden rounded-t-[14px]">
-          <div className="grid grid-cols-5 border-b border-[#E6E6E6] bg-[#F7F7F7]">
+          <div className="grid grid-cols-4 border-b border-[#E6E6E6] bg-[#F7F7F7]">
           {tabs.map((tab, index) => {
             const active = pathname === tab.href;
 

@@ -11,6 +11,9 @@ export interface Branch {
   requestFrequencyDays: number;
   complaintEmails: string[];
   reminderEmails: string[];
+  smsEnabled: boolean;
+  smsTemplate: string | null;
+  smsMonthlyLimit: number | null;
   avgRating: number;
   npsScore: number;
 }
@@ -26,6 +29,9 @@ type BranchDto = {
   requestFrequencyDays: number;
   complaintEmails: string[];
   reminderEmails: string[];
+  smsEnabled: boolean;
+  smsTemplate: string | null;
+  smsMonthlyLimit: number | null;
   avgRating: number;
   npsScore: number;
 };
@@ -40,6 +46,9 @@ type BranchUpdatePayload = Partial<{
   requestFrequencyDays: number;
   complaintEmails: string[];
   reminderEmails: string[];
+  smsEnabled: boolean;
+  smsTemplate: string | null;
+  smsMonthlyLimit: number | null;
 }>;
 
 function mapBranchDto(branch: BranchDto): Branch {
@@ -67,6 +76,9 @@ function toBranchUpdateDto(data: BranchUpdatePayload) {
   if ("reminderEmails" in data) {
     dto.reminder_emails = data.reminderEmails;
   }
+  if ("smsEnabled" in data) dto.sms_enabled = data.smsEnabled;
+  if ("smsTemplate" in data) dto.sms_template = data.smsTemplate;
+  if ("smsMonthlyLimit" in data) dto.sms_monthly_limit = data.smsMonthlyLimit;
 
   return dto;
 }

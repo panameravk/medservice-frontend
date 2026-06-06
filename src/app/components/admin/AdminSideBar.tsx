@@ -75,7 +75,7 @@ export function AdminSidebar() {
         </div>
 
         <nav className="mt-12 space-y-3">
-          {nav.map((item) => {
+          {nav.map((item, i) => {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
 
@@ -83,8 +83,9 @@ export function AdminSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                style={{ animationDelay: `${80 + i * 70}ms` }}
                 className={[
-                  "flex items-center gap-3 rounded-[10px] px-1 py-1 text-[16px] transition",
+                  "animate-item flex items-center gap-3 rounded-[10px] px-1 py-1 text-[16px] transition",
                   active
                     ? "font-bold text-[#111827]"
                     : "font-bold text-[#111827] hover:opacity-70",

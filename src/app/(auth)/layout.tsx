@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { Roboto_Flex } from "next/font/google";
 import { Brand } from "../components/Brand";
 import { Footer } from "../components/Footer";
+import { PageTransition } from "../components/PageTransition";
 
 const robotoFlex = Roboto_Flex({
   subsets: ["cyrillic"],
@@ -32,7 +33,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
           {/* Контент */}
           <div className="flex flex-1 items-start justify-center pt-10">
-            <div className="w-full max-w-[420px]">{children}</div>
+            <div className="w-full max-w-[420px]">
+              <PageTransition>{children}</PageTransition>
+            </div>
           </div>
 
           <Footer className="mt-auto" />
@@ -41,8 +44,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         {/* Правая часть */}
         <section className="relative hidden lg:block">
           <Image
-            src="/images/clinic.jpg"
-            alt="Clinic background"
+            src="/images/enter-picture.svg"
+            alt="Иллюстрация входа"
             fill
             className="object-cover"
             priority

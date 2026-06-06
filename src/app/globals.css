@@ -11,3 +11,143 @@ body {
   @apply rounded-[16px] border border-[#E5E7EB] bg-white px-6 py-6;
   box-shadow: 0px 6px 15px rgba(17, 24, 39, 0.08);
 }
+
+/* ============================================================================
+   Motion — shared across the whole site (mirrors the patient mini app).
+   ========================================================================== */
+
+/* Whole-page entrance: smooths route changes so navigation feels like a soft
+   transition, not an abrupt swap. Applied via <PageTransition> in the layouts. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-page {
+  animation: page-enter 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Block/card reveal with optional stagger (set animation-delay inline). */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-rise {
+  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Nav items sliding in (sidebars, menus). */
+@keyframes item-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.animate-item {
+  animation: item-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Modal: backdrop fade + dialog pop. */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-overlay {
+  animation: overlay-in 0.2s ease-out both;
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-modal {
+  animation: modal-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Patient gift banner: idle float, countdown-tile pop, gradient sheen. */
+@keyframes gift-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(-7deg);
+  }
+}
+.animate-gift-bob {
+  animation: gift-bob 2.6s ease-in-out infinite;
+  transform-origin: 60% 80%;
+}
+@keyframes tile-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.16);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-tile-pop {
+  animation: tile-pop 0.45s ease-out;
+}
+@keyframes sheen {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+.animate-sheen {
+  animation: sheen 3.8s ease-in-out infinite;
+}
+
+/* Gentle, universal smoothing for interactive elements. Transform is left out
+   on purpose so components that animate their own transform (switches, etc.)
+   aren't disturbed. */
+@layer base {
+  a,
+  button {
+    transition-property: color, background-color, border-color, box-shadow,
+      opacity, filter;
+    transition-duration: 0.18s;
+    transition-timing-function: ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

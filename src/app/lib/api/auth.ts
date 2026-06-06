@@ -27,12 +27,16 @@ export const authApi = {
       throw new ApiError("Некорректный ответ сервера", 500, data);
     }
 
+    setTokens(data.accessToken, "user");
+
+    // A superuser logging in from the regular page also gets admin access
+    // (so they can open /admin/* without a separate /admin/login).
     if (data.user.isSuperuser) {
-      throw new ApiError("Неверный логин или пароль", 401, data);
+      setTokens(data.accessToken, "admin");
+    } else {
+      clearTokens("admin");
     }
 
-    clearTokens("admin");
-    setTokens(data.accessToken, "user");
     return data;
   },
 
