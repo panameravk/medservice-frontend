@@ -1,7 +1,7 @@
 "use client";
 
 import { AuthGuard } from "../../components/AuthGuard";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getDateRangeByPeriod, type Period } from "../../lib/date";
 import { Unbounded } from "next/font/google";
@@ -107,27 +107,23 @@ function CalendarIcon({ className = "" }: { className?: string }) {
 
 function DateField({
   value,
-  onChange,
   formatRu,
+  onChange,
 }: {
   value: string;
+  formatRu: (value: string) => string;
   onChange: (next: string) => void;
-  formatRu: (iso: string) => string;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const openPicker = () => {
+  const openCalendar = () => {
     const input = inputRef.current;
+
     if (!input) return;
 
-    const pickerInput = input as HTMLInputElement & {
-      showPicker?: () => void;
-    };
-
-    if (typeof pickerInput.showPicker === "function") {
-      pickerInput.showPicker();
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
     } else {
-      input.focus();
       input.click();
     }
   };
@@ -135,18 +131,48 @@ function DateField({
   return (
     <button
       type="button"
-      onClick={openPicker}
-      className="relative flex h-10 w-[170px] items-center justify-between gap-2 rounded-[12px] border border-[#E5E7EB] bg-white px-4 text-[13px] text-[#111827] shadow-[0_1px_0_rgba(0,0,0,0.02)]"
+      onClick={openCalendar}
+      className="relative flex h-10 w-[150px] items-center justify-between gap-2 rounded-[10px] border border-[#E5E7EB] bg-white px-3 text-[13px] text-[#111827] shadow-[0_1px_0_rgba(0,0,0,0.02)]"
     >
       <span className="tabular-nums">{formatRu(value)}</span>
-      <CalendarIcon className="text-[#9CA3AF]" />
+
+      <svg
+        className="text-[#9CA3AF]"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <path
+          d="M7 3v3M17 3v3"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M4 8h16"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <rect
+          x="5"
+          y="5"
+          width="14"
+          height="16"
+          rx="2"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+      </svg>
+
       <input
         ref={inputRef}
         type="date"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onClick={(e) => e.stopPropagation()}
-        className="absolute inset-0 h-full w-full opacity-0"
+        onChange={(event) => onChange(event.target.value)}
+        className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+        tabIndex={-1}
       />
     </button>
   );
@@ -186,11 +212,6 @@ export default function BranchesPage() {
 
   const [userName, setUserName] = useState("...");
   const [userEmail, setUserEmail] = useState("");
-
-  const selectedBranch = useMemo(
-    () => rows.find((row) => String(row.id) === selectedBranchId) ?? null,
-    [rows, selectedBranchId]
-  );
 
   useEffect(() => {
     let cancelled = false;
@@ -310,11 +331,6 @@ export default function BranchesPage() {
                   className={`${unbounded.className} text-[28px] font-[600] tracking-[-0.02em] text-[#111827]`}
                 >
                   Фидбэк
-                </div>
-                <div
-                  className={`${unbounded.className} mt-[6px] text-[12px] italic font-[600] text-[#111827]`}
-                >
-                  ИИ
                 </div>
               </div>
 
@@ -469,6 +485,10 @@ export default function BranchesPage() {
                               key={row.id}
                               type="button"
                               onClick={() => selectBranchGlobal(String(row.id))}
+                              onDoubleClick={() => {
+                                selectBranchGlobal(String(row.id));
+                                router.push("/analytics");
+                              }}
                               className={`grid w-full grid-cols-[1.6fr_0.6fr_0.7fr_0.9fr_0.8fr_0.9fr] gap-4 py-4 text-left text-[14px] transition ${
                                 isSelected
                                   ? "bg-[#F8FAFC]"
@@ -510,32 +530,6 @@ export default function BranchesPage() {
                   )}
                 </div>
               </div>
-            </div>
-
-            <div className="mt-4 flex min-h-[40px] items-center justify-between gap-4">
-              <div className="min-w-0 flex-1 text-[13px] text-[#6B7280]">
-                <span className="block truncate">
-                  {selectedBranch
-                    ? `Вы выбрали: ${selectedBranch.name}`
-                    : "Выберите филиал из списка"}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                disabled={!selectedBranchId}
-                onClick={() => {
-                  if (!selectedBranchId) return;
-                  router.push("/analytics");
-                }}
-                className={`h-10 shrink-0 rounded-[10px] px-4 text-[13px] font-semibold transition ${
-                  selectedBranchId
-                    ? "bg-yellow-400 text-[#111827] hover:bg-yellow-300 active:brightness-90"
-                    : "cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]"
-                }`}
-              >
-                Выбрать филиал
-              </button>
             </div>
           </div>
         </div>
