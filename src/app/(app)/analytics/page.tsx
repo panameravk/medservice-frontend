@@ -1,6 +1,18 @@
 "use client";
 
+<<<<<<< Updated upstream
 import { useEffect, useMemo, useState } from "react";
+=======
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Area,
+  AreaChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+} from "recharts";
+>>>>>>> Stashed changes
 import { getDashboard, type DashboardData, type Period } from "../../lib/api";
 import { useBranchesStore } from "../../lib/branchesStore";
 import { getDateRangeByPeriod } from "../../lib/date";
@@ -142,6 +154,122 @@ function SmallBarChart({
   );
 }
 
+<<<<<<< Updated upstream
+=======
+function NpsSmallSection({
+  data,
+  satisfaction,
+}: {
+  data: DashboardData["npsSmall"];
+  satisfaction: DashboardData["satisfaction"];
+}) {
+  const chartData = useMemo(() => {
+    if (!data.length) return [];
+    return data.map((item) => ({
+      index: item.index,
+      nps: item.nps,
+      label: formatDateShort(new Date(item.bucketStart)),
+      range: `${formatDateShort(
+        new Date(item.bucketStart)
+      )} – ${formatDateShort(new Date(item.bucketEnd))}`,
+    }));
+  }, [data]);
+
+  const aggregateNps = computeAggregateNps(satisfaction);
+
+  return (
+    <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
+      <div className="mb-1 flex items-baseline justify-between">
+        <div className="text-[14px] font-medium text-[#111827]">
+          Динамика NPS
+        </div>
+        {aggregateNps !== null && (
+          <div className="text-[20px] font-bold leading-none text-[#111827] tabular-nums">
+            {aggregateNps}
+          </div>
+        )}
+      </div>
+
+      {aggregateNps === null ? (
+        <EmptyState text="Нет данных по NPS" />
+      ) : (
+        <div className="h-[90px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={chartData}
+              margin={{ top: 5, right: 4, bottom: 0, left: 0 }}
+            >
+              <defs>
+                <linearGradient id="npsSmallFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#60A5FA" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="#60A5FA" stopOpacity={0.05} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="label" hide />
+              <ReferenceLine y={0} stroke="#E5E7EB" strokeDasharray="2 2" />
+              <Tooltip
+                cursor={{ stroke: "#CBD5E1", strokeDasharray: "3 3" }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const row = payload[0].payload as {
+                    range: string;
+                    nps: number;
+                  };
+                  return (
+                    <div className="rounded-[8px] border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11px] text-[#111827] shadow-[0_4px_10px_rgba(17,24,39,0.08)]">
+                      <div className="text-[#6B7280]">{row.range}</div>
+                      <div className="font-semibold">
+                        NPS: <span className="tabular-nums">{row.nps}</span>
+                      </div>
+                    </div>
+                  );
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="nps"
+                stroke="#3B82F6"
+                strokeWidth={1.8}
+                fill="url(#npsSmallFill)"
+                dot={{ r: 2, fill: "#3B82F6" }}
+                activeDot={{ r: 4, fill: "#1D4ED8" }}
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function computeAggregateNps(
+  satisfaction: DashboardData["satisfaction"]
+): number | null {
+  const total = satisfaction.reduce((acc, row) => acc + row.count, 0);
+  if (total === 0) return null;
+  const promoters = satisfaction.find((r) => r.stars === 5)?.count ?? 0;
+  const detractors = satisfaction
+    .filter((r) => r.stars <= 3)
+    .reduce((acc, r) => acc + r.count, 0);
+  return Math.round(((promoters - detractors) / total) * 100);
+}
+
+function pluralize(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+function formatDateShort(date: Date): string {
+  const d = String(date.getDate()).padStart(2, "0");
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  return `${d}.${m}`;
+}
+
+>>>>>>> Stashed changes
 function LargeBarChart({ values }: { values: number[] }) {
   const safe = values.length ? values : [0];
   const min = Math.min(...safe);
@@ -259,17 +387,38 @@ export default function AnalyticsPage() {
     value: string;
     onChange: (next: string) => void;
   }) {
+    const inputRef = useRef<HTMLInputElement | null>(null);
+
+    const openCalendar = () => {
+      const input = inputRef.current;
+
+      if (!input) return;
+
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+      } else {
+        input.click();
+      }
+    };
+
     return (
-      <div className="relative flex h-10 w-[150px] items-center justify-between gap-2 rounded-[10px] border border-[#E5E7EB] bg-white px-3 text-[13px] text-[#111827] shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+      <button
+        type="button"
+        onClick={openCalendar}
+        className="relative flex h-10 w-[150px] items-center justify-between gap-2 rounded-[10px] border border-[#E5E7EB] bg-white px-3 text-[13px] text-[#111827] shadow-[0_1px_0_rgba(0,0,0,0.02)]"
+      >
         <span className="tabular-nums">{formatRu(value)}</span>
         <CalendarIcon className="text-[#9CA3AF]" />
+
         <input
+          ref={inputRef}
           type="date"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+          tabIndex={-1}
         />
-      </div>
+      </button>
     );
   }
 
@@ -318,7 +467,6 @@ export default function AnalyticsPage() {
     }
 
     if (useCustomRange && dateFrom && dateTo && dateFrom > dateTo) {
-      // Не делаем запрос в "перевёрнутом" диапазоне
       return;
     }
 
@@ -453,7 +601,7 @@ export default function AnalyticsPage() {
                 <MetricStat
                   value={dashboard.sent}
                   labelTop="отправлено"
-                  labelBottom=""
+                  labelBottom="запросов"
                 />
                 <MetricStat
                   value={dashboard.reviews}

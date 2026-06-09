@@ -73,8 +73,10 @@ export function Sidebar() {
           {nav.map((item) => {
             const active =
               item.href === "/settings/branch"
-                ? pathname === "/settings/branch" || pathname.startsWith("/settings/")
-                : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                ? pathname === "/settings/branch" ||
+                  pathname.startsWith("/settings/")
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
 
             return (
               <Link
