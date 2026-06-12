@@ -42,3 +42,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Внутренние доки не коммитим (README остаётся затрекканным)
+*.md
