@@ -11,19 +11,19 @@ services:
       - "3000"
 
   # Patient mini-app (Vite SPA). Builds dist/ and serves it via an internal
-  # Caddy that does SPA-fallback and proxies /api/* to the backend, so the mini
-  # uses a same-origin (CORS-free) API. The edge Caddy reverse-proxies the mini
-  # domain here. Without this service, every patient SMS review link 404s.
+  # Caddy with SPA-fallback. The API origin (https://API_DOMAIN) is baked in at
+  # build time — backend CORS_ORIGINS must include the mini domain. The edge
+  # Caddy reverse-proxies the mini domain here. Without this service, every
+  # patient SMS review link 404s.
   mini:
     build:
       context: ../medservice-mini
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${NEXT_PUBLIC_API_URL}
     image: medservice-mini:prod
     container_name: medservice_mini
     restart: unless-stopped
-    environment:
-      BACKEND_PRIVATE_HOST: ${BACKEND_PRIVATE_HOST}
-      BACKEND_PRIVATE_PORT: ${BACKEND_PRIVATE_PORT}
     expose:
       - "80"
 
@@ -39,10 +39,7 @@ services:
       - "443:443"
     environment:
       APP_DOMAIN: ${APP_DOMAIN}
-      API_DOMAIN: ${API_DOMAIN}
       MINI_DOMAIN: ${MINI_DOMAIN}
-      BACKEND_PRIVATE_HOST: ${BACKEND_PRIVATE_HOST}
-      BACKEND_PRIVATE_PORT: ${BACKEND_PRIVATE_PORT}
       ACME_EMAIL: ${ACME_EMAIL}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

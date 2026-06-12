@@ -17,11 +17,8 @@ fi
 set -a; source .env; set +a
 : "${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL must be set in .env}"
 : "${APP_DOMAIN:?APP_DOMAIN must be set in .env}"
-: "${API_DOMAIN:?API_DOMAIN must be set in .env}"
 : "${MINI_DOMAIN:?MINI_DOMAIN must be set in .env}"
 : "${ACME_EMAIL:?ACME_EMAIL must be set in .env}"
-: "${BACKEND_PRIVATE_HOST:?BACKEND_PRIVATE_HOST must be set in .env}"
-: "${BACKEND_PRIVATE_PORT:?BACKEND_PRIVATE_PORT must be set in .env}"
 case "${NEXT_PUBLIC_API_URL}" in
     *localhost*|*127.0.0.1*)
         echo "[deploy] ERROR: NEXT_PUBLIC_API_URL points at localhost — must be the public API domain." >&2
