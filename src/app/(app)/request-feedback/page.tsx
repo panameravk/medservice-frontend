@@ -147,6 +147,10 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
   const [requestLoading, setRequestLoading] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [requestSuccess, setRequestSuccess] = useState(false);
+  const [requestWarning, setRequestWarning] = useState<{
+    reason: string;
+    link: string | null;
+  } | null>(null);
 
   const [blLastName, setBlLastName] = useState("");
   const [blFirstName, setBlFirstName] = useState("");
@@ -203,9 +207,10 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
     setRequestLoading(true);
     setRequestError(null);
     setRequestSuccess(false);
+    setRequestWarning(null);
 
     try {
-      await createRequest({
+      const created = await createRequest({
         branchId: Number(branchId),
         clientName: `${lastName} ${firstName}`.trim(),
         clientPhone: phone.trim(),
@@ -215,7 +220,20 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
       setFirstName("");
       setPhone("");
       setSelectedEmployees([]);
-      setRequestSuccess(true);
+
+      // 201 означает «запрос создан», но SMS могла не уйти (отключена,
+      // лимит, ошибка провайдера) — это приходит в поле sms.
+      if (created.sms && !created.sms.ok) {
+        setRequestWarning({
+          reason:
+            created.sms.skippedReason ??
+            created.sms.error ??
+            "SMS не отправлена",
+          link: created.requestLink,
+        });
+      } else {
+        setRequestSuccess(true);
+      }
     } catch (error) {
       if (error instanceof ApiError) {
         setRequestError(error.message);
@@ -351,6 +369,21 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
             )}
             {requestSuccess && (
               <p className="text-[13px] text-green-600">Запрос отправлен!</p>
+            )}
+            {requestWarning && (
+              <div className="rounded-[10px] bg-amber-50 px-3 py-2.5 text-[13px] text-amber-700">
+                <p>
+                  Запрос создан, но SMS не отправлена: {requestWarning.reason}
+                </p>
+                {requestWarning.link && (
+                  <p className="mt-1 break-all text-[12px] text-amber-800">
+                    Ссылку можно передать пациенту вручную:{" "}
+                    <span className="select-all font-medium">
+                      {requestWarning.link}
+                    </span>
+                  </p>
+                )}
+              </div>
             )}
 
             <button

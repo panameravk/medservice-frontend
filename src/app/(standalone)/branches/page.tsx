@@ -1,6 +1,11 @@
 "use client";
 
 import { AuthGuard } from "../../components/AuthGuard";
+import { ImpersonationBanner } from "../../components/ImpersonationBanner";
+import {
+  useExitImpersonation,
+  useImpersonation,
+} from "../../lib/useImpersonation";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getDateRangeByPeriod, type Period } from "../../lib/date";
@@ -190,6 +195,9 @@ export default function BranchesPage() {
   const userBtnRef = useRef<HTMLButtonElement>(null);
   const userPopRef = useRef<HTMLDivElement>(null);
 
+  const impersonation = useImpersonation();
+  const exitImpersonation = useExitImpersonation();
+
   const toISODate = (d: Date) => d.toISOString().slice(0, 10);
 
   const [activePreset, setActivePreset] = useState<Period | null>("30");
@@ -323,6 +331,7 @@ export default function BranchesPage() {
   return (
     <AuthGuard>
       <main className="flex min-h-screen flex-col bg-[rgba(242,243,244,1)]">
+        <ImpersonationBanner />
         <div className="flex-1">
           <div className="px-8 pt-6">
             <div className="flex items-start justify-between">
@@ -376,6 +385,12 @@ export default function BranchesPage() {
                     <button
                       type="button"
                       onClick={() => {
+                        setUserOpen(false);
+                        // В режиме просмотра «Выйти» возвращает в админ-панель.
+                        if (impersonation) {
+                          exitImpersonation();
+                          return;
+                        }
                         authApi.logout();
                         resetBranchesStore();
                         router.replace("/login");

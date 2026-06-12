@@ -65,6 +65,7 @@ export const config = {
     "/forgot-password",
     "/analytics/:path*",
     "/blacklist/:path*",
+    "/bonuses/:path*",
     "/request-feedback/:path*",
     "/reviews-and-requests/:path*",
     "/settings/:path*",

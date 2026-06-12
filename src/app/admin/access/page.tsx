@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AdminModal } from "../../components/admin/AdminModal";
 import { AdminShellCard } from "../../components/admin/AdminShellCard";
-import { adminAccessApi } from "../../lib/admin/api";
-import type { AdminAccessUser } from "../../types/admin";
+import { adminAccessApi, adminBranchesApi } from "../../lib/admin/api";
+import { setTokens } from "../../lib/api";
+import { setImpersonation } from "../../lib/impersonation";
+import { useBranchesStore } from "../../lib/branchesStore";
+import type { AdminAccessUser, AdminBranch } from "../../types/admin";
 
 function EditIcon() {
   return (
@@ -17,6 +21,34 @@ function EditIcon() {
       />
       <path
         d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function LoginIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <polyline
+        points="10 17 15 12 10 7"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15 12H3"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
@@ -55,14 +87,45 @@ function TrashIcon() {
 }
 
 export default function AdminAccessPage() {
+  const router = useRouter();
+  const resetBranchesStore = useBranchesStore((s) => s.reset);
+
   const [items, setItems] = useState<AdminAccessUser[]>([]);
+  const [branches, setBranches] = useState<AdminBranch[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<AdminAccessUser | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [impersonatingId, setImpersonatingId] = useState<number | null>(null);
 
   useEffect(() => {
     void adminAccessApi.getAll().then(setItems);
+    void adminBranchesApi.getAll().then(setBranches);
   }, []);
+
+  // Открыть кабинет от имени пользователя: подменяем user-сессию его токеном
+  // (admin-сессия остаётся), ставим флаг для баннера «Аккаунт Администратора».
+  const onImpersonate = async (user: AdminAccessUser) => {
+    setError(null);
+    setImpersonatingId(user.id);
+    try {
+      const { accessToken, user: target } = await adminAccessApi.impersonate(
+        user.id
+      );
+      setTokens(accessToken, "user");
+      setImpersonation({
+        kind: "user",
+        userId: target.id,
+        userName: target.fullName || target.username,
+      });
+      resetBranchesStore();
+      router.push("/branches");
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Не удалось войти в аккаунт пользователя"
+      );
+      setImpersonatingId(null);
+    }
+  };
 
   const onDelete = async (id: number) => {
     try {
@@ -84,6 +147,7 @@ export default function AdminAccessPage() {
           role: payload.role,
           email: payload.email,
           phone: payload.phone,
+          branchIds: payload.branchIds,
         });
         setItems((prev) =>
           prev.map((item) => (item.id === payload.id ? updated : item))
@@ -96,6 +160,7 @@ export default function AdminAccessPage() {
           role: payload.role,
           email: payload.email,
           phone: payload.phone,
+          branchIds: payload.branchIds,
         });
         setItems((prev) => [...prev, created]);
       }
@@ -124,7 +189,7 @@ export default function AdminAccessPage() {
       )}
 
       <AdminShellCard>
-        <div className="grid grid-cols-[1.45fr_1fr_0.9fr_0.9fr_70px] items-center text-[13px] font-medium text-[#222222]">
+        <div className="grid grid-cols-[1.45fr_1fr_0.9fr_0.9fr_100px] items-center text-[13px] font-medium text-[#222222]">
           <div>ФИО / Логин</div>
           <div>Роль в команде</div>
           <div>Email</div>
@@ -136,7 +201,7 @@ export default function AdminAccessPage() {
           {items.map((item) => (
             <div
               key={item.id}
-              className="grid grid-cols-[1.45fr_1fr_0.9fr_0.9fr_70px] items-center text-[16px] text-[#3A3A46]"
+              className="grid grid-cols-[1.45fr_1fr_0.9fr_0.9fr_100px] items-center text-[16px] text-[#3A3A46]"
             >
               <div>
                 <div>{item.fullName ?? "—"}</div>
@@ -146,6 +211,17 @@ export default function AdminAccessPage() {
               <div>{item.email}</div>
               <div>{item.phone ?? "—"}</div>
               <div className="flex items-center justify-end gap-3 text-[#A3A3A3]">
+                <button
+                  type="button"
+                  title="Войти в аккаунт пользователя"
+                  disabled={impersonatingId !== null}
+                  onClick={() => {
+                    void onImpersonate(item);
+                  }}
+                  className="transition hover:text-[#222222] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <LoginIcon />
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -185,6 +261,7 @@ export default function AdminAccessPage() {
       {open && (
         <AccessModal
           initial={editing}
+          branches={branches}
           onClose={() => {
             setOpen(false);
             setEditing(null);
@@ -199,10 +276,12 @@ export default function AdminAccessPage() {
 
 function AccessModal({
   initial,
+  branches,
   onClose,
   onSave,
 }: {
   initial: AdminAccessUser | null;
+  branches: AdminBranch[];
   onClose: () => void;
   onSave: (
     payload: Omit<AdminAccessUser, "id"> & { id?: number; password?: string }
@@ -214,8 +293,15 @@ function AccessModal({
   const [role, setRole] = useState(initial?.role ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
+  const [branchIds, setBranchIds] = useState<number[]>(initial?.branchIds ?? []);
 
   const isEditing = !!initial;
+  const isSuperuser = initial?.isSuperuser ?? false;
+
+  const toggleBranch = (id: number) =>
+    setBranchIds((prev) =>
+      prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]
+    );
 
   return (
     <AdminModal onClose={onClose}>
@@ -291,6 +377,36 @@ function AccessModal({
           />
         </div>
 
+        <div>
+          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+            Доступ к филиалам
+          </label>
+          {isSuperuser ? (
+            <p className="text-[13px] text-[#6E6E73]">
+              Администратор видит все филиалы.
+            </p>
+          ) : branches.length === 0 ? (
+            <p className="text-[13px] text-[#A3A3A3]">Нет филиалов.</p>
+          ) : (
+            <div className="max-h-[180px] space-y-2 overflow-y-auto rounded-[10px] bg-[#F3F4F6] p-3">
+              {branches.map((b) => (
+                <label
+                  key={b.id}
+                  className="flex cursor-pointer items-center gap-2 text-[14px] text-[#222222]"
+                >
+                  <input
+                    type="checkbox"
+                    checked={branchIds.includes(b.id)}
+                    onChange={() => toggleBranch(b.id)}
+                    className="h-4 w-4 accent-[#F4C21A]"
+                  />
+                  {b.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={() =>
@@ -302,6 +418,8 @@ function AccessModal({
               role: role.trim() || null,
               email: email.trim(),
               phone: phone.trim() || null,
+              isSuperuser,
+              branchIds,
             })
           }
           className="mt-2 h-[48px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95"

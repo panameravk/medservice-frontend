@@ -24,6 +24,8 @@ export type AdminAccessUser = {
   role: string | null;
   email: string;
   phone: string | null;
+  isSuperuser: boolean;
+  branchIds: number[];
 };
 
 export type AdminAccount = {

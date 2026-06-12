@@ -11,3 +11,11 @@
     encode zstd gzip
     reverse_proxy {$BACKEND_PRIVATE_HOST}:{$BACKEND_PRIVATE_PORT}
 }
+
+# Patient mini-app. The mini container serves the SPA (with history fallback)
+# and proxies its own /api/* to the backend, so we just hand the whole domain to
+# it. SMS review links (MINI_PUBLIC_URL) point here.
+{$MINI_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy mini:80
+}

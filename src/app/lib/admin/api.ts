@@ -27,6 +27,7 @@ interface UserDto {
   role: string | null;
   isActive: boolean;
   isSuperuser: boolean;
+  branchIds: number[];
 }
 
 const ADMIN_SESSION = { session: "admin" as const };
@@ -60,6 +61,8 @@ function mapUser(u: UserDto): AdminAccessUser {
     role: u.role,
     email: u.email,
     phone: u.phone,
+    isSuperuser: u.isSuperuser,
+    branchIds: u.branchIds ?? [],
   };
 }
 
@@ -172,6 +175,7 @@ export const adminAccessApi = {
     role: string | null;
     email: string;
     phone: string | null;
+    branchIds?: number[];
   }): Promise<AdminAccessUser> {
     const user = await apiFetch<UserDto>("/admin/users", {
       ...ADMIN_SESSION,
@@ -183,6 +187,7 @@ export const adminAccessApi = {
         full_name: payload.fullName,
         phone: payload.phone,
         role: payload.role,
+        branch_ids: payload.branchIds ?? [],
       },
     });
     return mapUser(user);
@@ -190,13 +195,20 @@ export const adminAccessApi = {
 
   async update(
     id: number,
-    payload: Partial<{ fullName: string | null; role: string | null; email: string; phone: string | null }>
+    payload: Partial<{
+      fullName: string | null;
+      role: string | null;
+      email: string;
+      phone: string | null;
+      branchIds: number[];
+    }>
   ): Promise<AdminAccessUser> {
     const body: Record<string, unknown> = {};
     if ("fullName" in payload) body.full_name = payload.fullName;
     if ("role" in payload) body.role = payload.role;
     if ("email" in payload) body.email = payload.email;
     if ("phone" in payload) body.phone = payload.phone;
+    if ("branchIds" in payload) body.branch_ids = payload.branchIds;
 
     const user = await apiFetch<UserDto>(`/admin/users/${id}`, {
       ...ADMIN_SESSION,
@@ -211,6 +223,17 @@ export const adminAccessApi = {
       ...ADMIN_SESSION,
       method: "DELETE",
     });
+  },
+
+  /** Получить токен пользователя, чтобы открыть кабинет от его имени. */
+  async impersonate(
+    id: number
+  ): Promise<{ accessToken: string; user: AdminAccessUser }> {
+    const data = await apiFetch<{ accessToken: string; user: UserDto }>(
+      `/admin/users/${id}/impersonate`,
+      { ...ADMIN_SESSION, method: "POST" }
+    );
+    return { accessToken: data.accessToken, user: mapUser(data.user) };
   },
 };
 

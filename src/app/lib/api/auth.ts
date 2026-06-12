@@ -1,12 +1,24 @@
 import { ApiError, apiFetch, clearTokens, setTokens } from "./client";
+import { clearImpersonation } from "../impersonation";
 
 export interface AuthUser {
   id: number;
   username: string;
   email: string;
   fullName: string | null;
+  phone: string | null;
+  role: string | null;
   isActive: boolean;
   isSuperuser: boolean;
+}
+
+export interface UpdateMePayload {
+  fullName?: string | null;
+  email?: string;
+  phone?: string | null;
+  role?: string | null;
+  /** Если задан — пароль будет заменён. */
+  password?: string;
 }
 
 export interface LoginResponse {
@@ -28,6 +40,8 @@ export const authApi = {
     }
 
     setTokens(data.accessToken, "user");
+    // Свежий логин — это всегда собственная сессия, а не просмотр чужого аккаунта.
+    clearImpersonation();
 
     // A superuser logging in from the regular page also gets admin access
     // (so they can open /admin/* without a separate /admin/login).
@@ -42,8 +56,30 @@ export const authApi = {
 
   me: () => apiFetch<AuthUser>("/auth/me", { session: "user" }),
 
+  // Профиль общий с админкой («Доступы» читают ту же запись users) —
+  // сохранённое здесь сразу видно там.
+  updateMe: (payload: UpdateMePayload) => {
+    const body: Record<string, unknown> = {};
+    if ("fullName" in payload) body.full_name = payload.fullName;
+    if ("email" in payload) body.email = payload.email;
+    if ("phone" in payload) body.phone = payload.phone;
+    if ("role" in payload) body.role = payload.role;
+    if (payload.password) body.password = payload.password;
+
+    return apiFetch<AuthUser>("/auth/me", {
+      method: "PATCH",
+      session: "user",
+      body,
+    });
+  },
+
   logout: () => {
+    // Clear BOTH sessions: a superuser who logged in here also has the admin
+    // token set (see login above), and leaving it behind would keep /admin/*
+    // reachable after "logout" on a shared machine.
     clearTokens("user");
+    clearTokens("admin");
+    clearImpersonation();
   },
 
   forgotPassword: (email: string) =>
@@ -72,6 +108,7 @@ export const adminAuthApi = {
 
     setTokens(data.accessToken, "admin");
     setTokens(data.accessToken, "user");
+    clearImpersonation();
     return data;
   },
 

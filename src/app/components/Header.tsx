@@ -12,6 +12,10 @@ import {
 } from "react";
 import { useBranchesStore } from "../lib/branchesStore";
 import { authApi } from "../lib/api";
+import {
+  useExitImpersonation,
+  useImpersonation,
+} from "../lib/useImpersonation";
 import { useRouter } from "next/navigation";
 
 function ChevronDown({ className = "" }: { className?: string }) {
@@ -70,8 +74,19 @@ export function Header() {
 
   const [userName, setUserName] = useState("...");
   const [userEmail, setUserEmail] = useState("");
+  const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
+
+  // Поля модалки «Настроить аккаунт» (заполняются при открытии).
+  const [accEmail, setAccEmail] = useState("");
+  const [accPassword, setAccPassword] = useState("");
+  const [accName, setAccName] = useState("");
+  const [accPhone, setAccPhone] = useState("");
+  const [accRole, setAccRole] = useState("");
+  const [accSaving, setAccSaving] = useState(false);
+  const [accError, setAccError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +99,8 @@ export function Header() {
 
         setUserName(user.fullName || user.username);
         setUserEmail(user.email);
+        setUserPhone(user.phone);
+        setUserRole(user.role);
       } catch {
         if (cancelled) return;
       }
@@ -95,6 +112,55 @@ export function Header() {
       cancelled = true;
     };
   }, []);
+
+  const openAccountSettings = () => {
+    setAccEmail(userEmail);
+    setAccPassword("");
+    setAccName(userName === "..." ? "" : userName);
+    setAccPhone(userPhone ?? "");
+    setAccRole(userRole ?? "");
+    setAccError(null);
+    setIsAccountSettingsOpen(true);
+  };
+
+  const handleAccountSave = async () => {
+    if (accSaving) return;
+
+    const password = accPassword.trim();
+    if (password && password.length < 8) {
+      setAccError("Пароль должен быть не короче 8 символов");
+      return;
+    }
+    if (!accEmail.trim()) {
+      setAccError("Email не может быть пустым");
+      return;
+    }
+
+    setAccError(null);
+    setAccSaving(true);
+    try {
+      // Сохраняется в общий профиль users — админка («Доступы»)
+      // увидит изменения сразу.
+      const updated = await authApi.updateMe({
+        email: accEmail.trim(),
+        fullName: accName.trim() || null,
+        phone: accPhone.trim() || null,
+        role: accRole.trim() || null,
+        ...(password ? { password } : {}),
+      });
+      setUserName(updated.fullName || updated.username);
+      setUserEmail(updated.email);
+      setUserPhone(updated.phone);
+      setUserRole(updated.role);
+      setIsAccountSettingsOpen(false);
+    } catch (e) {
+      setAccError(
+        e instanceof Error ? e.message : "Не удалось сохранить изменения"
+      );
+    } finally {
+      setAccSaving(false);
+    }
+  };
 
   const selectedBranch = useMemo(() => {
     if (!branches.length) return null;
@@ -117,8 +183,19 @@ export function Header() {
   useOutsideClick([branchBtnRef, branchPopRef], closeBranchMenu);
   useOutsideClick([userBtnRef, userPopRef], closeUserMenu);
 
+  const impersonation = useImpersonation();
+  const exitImpersonation = useExitImpersonation();
+
   const handleLogout = () => {
     setUserOpen(false);
+
+    // В режиме просмотра (вход из админки) «Выйти» возвращает в админ-панель,
+    // не разрушая админскую сессию.
+    if (impersonation) {
+      exitImpersonation();
+      return;
+    }
+
     authApi.logout();
     resetBranchesStore();
     router.replace("/login");
@@ -224,23 +301,25 @@ export function Header() {
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUserOpen(false);
-                    setIsAccountSettingsOpen(true);
-                  }}
-                  className="mt-4 flex h-10 w-full cursor-pointer items-center gap-3 rounded-[10px] px-3 text-[14px] text-[#000000] transition hover:bg-[#F3F4F6]"
-                >
-                  <Image
-                    src="/icons/setup-account_logo.svg"
-                    alt="Настроить аккаунт"
-                    width={32}
-                    height={32}
-                    className="h-8 w-8"
-                  />
-                  Настроить аккаунт
-                </button>
+                {!impersonation && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserOpen(false);
+                      openAccountSettings();
+                    }}
+                    className="mt-4 flex h-10 w-full cursor-pointer items-center gap-3 rounded-[10px] px-3 text-[14px] text-[#000000] transition hover:bg-[#F3F4F6]"
+                  >
+                    <Image
+                      src="/icons/setup-account_logo.svg"
+                      alt="Настроить аккаунт"
+                      width={32}
+                      height={32}
+                      className="h-8 w-8"
+                    />
+                    Настроить аккаунт
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -271,7 +350,8 @@ export function Header() {
                 </label>
                 <input
                   type="email"
-                  defaultValue={userEmail}
+                  value={accEmail}
+                  onChange={(e) => setAccEmail(e.target.value)}
                   placeholder="email@example.com"
                   className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF]"
                 />
@@ -283,7 +363,9 @@ export function Header() {
                 </label>
                 <input
                   type="password"
-                  placeholder="Введите пароль"
+                  value={accPassword}
+                  onChange={(e) => setAccPassword(e.target.value)}
+                  placeholder="Оставьте пустым, чтобы не менять"
                   className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF]"
                 />
               </div>
@@ -294,7 +376,8 @@ export function Header() {
                 </label>
                 <input
                   type="text"
-                  defaultValue={userName}
+                  value={accName}
+                  onChange={(e) => setAccName(e.target.value)}
                   placeholder="Иванов Иван Иванович"
                   className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF]"
                 />
@@ -306,6 +389,8 @@ export function Header() {
                 </label>
                 <input
                   type="tel"
+                  value={accPhone}
+                  onChange={(e) => setAccPhone(e.target.value)}
                   placeholder="+7 999 000 00 00"
                   className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF]"
                 />
@@ -313,20 +398,30 @@ export function Header() {
 
               <div>
                 <label className="mb-[8px] block text-[13px] font-medium text-[#111827]">
-                  Роль
+                  Роль в команде
                 </label>
-                <select className="h-[44px] w-full rounded-[9px] border border-[#D1D5DB] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none">
-                  <option>Администратор</option>
-                  <option>Пользователь</option>
-                </select>
+                <input
+                  type="text"
+                  value={accRole}
+                  onChange={(e) => setAccRole(e.target.value)}
+                  placeholder="Например, Менеджер"
+                  className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF]"
+                />
               </div>
+
+              {accError && (
+                <p className="text-[13px] leading-snug text-[#DC2626]">
+                  {accError}
+                </p>
+              )}
 
               <button
                 type="button"
-                onClick={() => setIsAccountSettingsOpen(false)}
-                className="mt-[2px] h-[44px] w-full rounded-[9px] bg-black text-[13px] font-medium text-white transition hover:bg-[#1F2937]"
+                onClick={() => void handleAccountSave()}
+                disabled={accSaving}
+                className="mt-[2px] h-[44px] w-full rounded-[9px] bg-black text-[13px] font-medium text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Сохранить
+                {accSaving ? "Сохраняем..." : "Сохранить"}
               </button>
 
               <button

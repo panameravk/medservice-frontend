@@ -8,6 +8,9 @@ import { AdminSearchInput } from "../../components/admin/AdminSearchInput";
 import { AdminShellCard } from "../../components/admin/AdminShellCard";
 import { AdminSwitch } from "../../components/admin/AdminSwitch";
 import { adminBranchesApi } from "../../lib/admin/api";
+import { getAccessToken, setTokens } from "../../lib/api";
+import { setImpersonation } from "../../lib/impersonation";
+import { useBranchesStore } from "../../lib/branchesStore";
 import type { AdminBranch } from "../../types/admin";
 
 const PLATFORM_FIELDS: Array<{ key: string; label: string; placeholder: string }> = [
@@ -94,6 +97,27 @@ export default function AdminBranchesPage() {
   }, [query]);
 
   const rows = useMemo(() => items, [items]);
+
+  const selectBranch = useBranchesStore((s) => s.selectBranch);
+  const resetBranchesStore = useBranchesStore((s) => s.reset);
+
+  // Провалиться в кабинет филиала: открываем пользовательский интерфейс с
+  // выбранным филиалом под собственным токеном админа (admin-сессия остаётся),
+  // флаг impersonation включает баннер «Аккаунт Администратора».
+  const enterBranchCabinet = (branch: AdminBranch) => {
+    const adminToken = getAccessToken("admin");
+    if (adminToken) {
+      setTokens(adminToken, "user");
+    }
+    setImpersonation({
+      kind: "branch",
+      branchId: branch.id,
+      branchName: branch.name,
+    });
+    resetBranchesStore();
+    selectBranch(String(branch.id));
+    router.push("/analytics");
+  };
 
   const toggleStatus = async (id: number) => {
     try {
@@ -201,8 +225,15 @@ export default function AdminBranchesPage() {
               key={item.id}
               className="grid grid-cols-[1.8fr_0.4fr_0.7fr_1.1fr_0.6fr_0.65fr_0.55fr] items-center py-[14px]"
             >
-              <div className="truncate pr-6 text-[16px] text-[#3A3A46] underline decoration-dotted underline-offset-4">
-                {item.name}
+              <div className="min-w-0 pr-6">
+                <button
+                  type="button"
+                  onClick={() => enterBranchCabinet(item)}
+                  title="Открыть кабинет филиала"
+                  className="max-w-full truncate text-left text-[16px] text-[#3A3A46] underline decoration-dotted underline-offset-4 transition hover:text-[#111827]"
+                >
+                  {item.name}
+                </button>
               </div>
 
               <div className="text-[16px] text-[#3A3A46]">{item.publicId}</div>
@@ -444,13 +475,6 @@ function CreateBranchModal({
   );
 }
 
-function parseEmails(raw: string): string[] {
-  return raw
-    .split(/[\n,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 function EditBranchModal({
   branch,
   onClose,
@@ -461,37 +485,23 @@ function EditBranchModal({
   onSave: (payload: {
     name: string;
     city: string | null;
-    address: string | null;
     phone: string | null;
     specialization: string;
-    timezone: string;
-    requestFrequencyDays: number;
-    paidUntil: string | null;
-    complaintEmails: string[];
-    reminderEmails: string[];
     platformUrls: Record<string, string>;
   }) => void;
 }) {
   const [name, setName] = useState(branch.name);
   const [city, setCity] = useState(branch.city ?? "");
-  const [address, setAddress] = useState(branch.address ?? "");
   const [phone, setPhone] = useState(branch.phone ?? "");
   const [specialization, setSpecialization] = useState(branch.specialization);
-  const [timezone, setTimezone] = useState(branch.timezone);
-  const [frequency, setFrequency] = useState<number>(branch.requestFrequencyDays);
-  const [paidUntil, setPaidUntil] = useState<string>(branch.paidUntil ?? "");
-  const [complaintsRaw, setComplaintsRaw] = useState(branch.complaintEmails.join("\n"));
-  const [remindersRaw, setRemindersRaw] = useState(branch.reminderEmails.join("\n"));
   const [urls, setUrls] = useState<Record<string, string>>({ ...branch.platformUrls });
 
   const inputCls =
     "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition";
   const selectCls =
     "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition appearance-none cursor-pointer";
-  const textareaCls =
-    "min-h-[74px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 py-3 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition";
 
-  const canSave = name.trim().length > 0 && frequency > 0;
+  const canSave = name.trim().length > 0;
 
   const handleSave = () => {
     const cleanedUrls: Record<string, string> = {};
@@ -502,14 +512,8 @@ function EditBranchModal({
     onSave({
       name: name.trim(),
       city: city.trim() || null,
-      address: address.trim() || null,
       phone: phone.trim() || null,
       specialization,
-      timezone,
-      requestFrequencyDays: frequency,
-      paidUntil: paidUntil || null,
-      complaintEmails: parseEmails(complaintsRaw),
-      reminderEmails: parseEmails(remindersRaw),
       platformUrls: cleanedUrls,
     });
   };
@@ -536,87 +540,18 @@ function EditBranchModal({
         </div>
 
         <div>
-          <label className="mb-2 block text-[13px] font-medium text-[#222222]">Адрес</label>
-          <input value={address} onChange={(e) => setAddress(e.target.value)} className={inputCls} />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-2 block text-[13px] font-medium text-[#222222]">Специализация</label>
-            <select
-              value={specialization}
-              onChange={(e) => setSpecialization(e.target.value)}
-              className={selectCls}
-            >
-              {[specialization, ...SPECIALIZATIONS.filter((s) => s !== specialization)].map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-2 block text-[13px] font-medium text-[#222222]">Часовой пояс</label>
-            <select
-              value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-              className={selectCls}
-            >
-              {[timezone, ...TIMEZONES.filter((t) => t !== timezone)].map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
-              Частота запросов (дней)
-            </label>
-            <input
-              type="number"
-              min={1}
-              value={frequency}
-              onChange={(e) => setFrequency(Number(e.target.value) || 0)}
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-[13px] font-medium text-[#222222]">Оплачено до</label>
-            <input
-              type="date"
-              value={paidUntil}
-              onChange={(e) => setPaidUntil(e.target.value)}
-              className={inputCls}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
-            Email для жалоб <span className="text-[#A3A3A3]">(по одному в строке или через запятую)</span>
-          </label>
-          <textarea
-            value={complaintsRaw}
-            onChange={(e) => setComplaintsRaw(e.target.value)}
-            placeholder="complaints@example.com"
-            className={textareaCls}
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
-            Email для напоминаний <span className="text-[#A3A3A3]">(по одному в строке или через запятую)</span>
-          </label>
-          <textarea
-            value={remindersRaw}
-            onChange={(e) => setRemindersRaw(e.target.value)}
-            placeholder="reminders@example.com"
-            className={textareaCls}
-          />
+          <label className="mb-2 block text-[13px] font-medium text-[#222222]">Специализация</label>
+          <select
+            value={specialization}
+            onChange={(e) => setSpecialization(e.target.value)}
+            className={selectCls}
+          >
+            {[specialization, ...SPECIALIZATIONS.filter((s) => s !== specialization)].map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="border-t border-[#ECECEC] pt-4">

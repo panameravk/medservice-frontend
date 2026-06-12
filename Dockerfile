@@ -10,6 +10,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
+# Fail fast: an empty API URL would bake the localhost fallback into the client
+# bundle (see src/app/lib/api/client.ts) and silently break the prod data layer.
+RUN test -n "$NEXT_PUBLIC_API_URL" || ( \
+      echo "ERROR: NEXT_PUBLIC_API_URL build-arg is required (e.g. https://api.example.com)"; \
+      exit 1 )
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
