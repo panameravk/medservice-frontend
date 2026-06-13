@@ -163,7 +163,7 @@ function MemberModal({
   const roleOptions: SelectOption[] = ROLES.map((r) => ({ label: r, value: r }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="w-full max-w-[420px] space-y-4 rounded-[16px] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)]">
         <div>
           <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">ФИО</label>

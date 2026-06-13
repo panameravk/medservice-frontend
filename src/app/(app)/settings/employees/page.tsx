@@ -370,7 +370,7 @@ function EmployeeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4">
+    <div className="fixed inset-0 z-50 grid place-items-center px-4">
       <div className="w-full max-w-[520px] rounded-[12px] border border-[#E5E7EB] bg-white p-5 shadow-[0_18px_40px_rgba(17,24,39,0.18)]">
         <div className="flex items-start justify-between gap-3">
           <div className="text-[14px] font-semibold text-[#111827]">
