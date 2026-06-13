@@ -5,11 +5,11 @@ import { useBranchesStore } from "../../../lib/branchesStore";
 import { getReviews, type Review } from "../../../lib/api";
 
 const PLATFORMS = [
-  { label: "Яндекс.Карты", value: "yandex_maps" },
-  { label: "Google Maps", value: "google_maps" },
-  { label: "2GIS", value: "2gis" },
-  { label: "ПроДокторов", value: "prodoctorov" },
-  { label: "НаПоправку", value: "napopravku" },
+  { label: "Яндекс.Карты", value: "yandex_maps", icon: "/Icons/platforms/yandex-maps-logo.svg" },
+  { label: "Google Maps", value: "google_maps", icon: "/Icons/platforms/google-maps-sign-logo.svg" },
+  { label: "2Gis", value: "2gis", icon: "/Icons/platforms/2gis-icon-logo.svg" },
+  { label: "ПроДокторов", value: "prodoctorov", icon: "/Icons/platforms/prodoctorov_logo.svg" },
+  { label: "НаПоправку", value: "napopravku", icon: "/Icons/platforms/napopravku_logo.svg" },
 ];
 
 const RATINGS = [1, 2, 3, 4, 5];
@@ -213,12 +213,14 @@ export default function PublishedReviewsPage() {
                   type="button"
                   onClick={() => togglePlatform(platform.value)}
                   className={[
-                    "inline-flex h-7 items-center rounded-[6px] border px-2.5 text-[12px] font-medium transition",
+                    "inline-flex h-7 items-center gap-1.5 rounded-[6px] border px-2.5 text-[12px] font-medium transition",
                     active
                       ? "border-[#111827] bg-[#111827] text-white"
                       : "border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6]",
                   ].join(" ")}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={platform.icon} alt="" className="h-[14px] w-[14px] shrink-0" />
                   {platform.label}
                 </button>
               );
@@ -253,25 +255,23 @@ export default function PublishedReviewsPage() {
 
               return (
                 <div key={review.id} className="px-6 py-5">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                     <span className="text-[14px] font-semibold leading-5 text-[#111827]">
                       {review.reviewerName || "Аноним"}
-                    </span>
-
-                    <span className="rounded-[6px] bg-[#F3F4F6] px-2 py-1 text-[11px] leading-none text-[#6B7280]">
-                      {platformLabel}
                     </span>
 
                     <span className="text-[12px] text-[#9CA3AF]">
                       {formatPublishedDate(review.publishedAt)}
                     </span>
 
-                    <div className="ml-auto">
-                      <Stars rating={review.rating} />
-                    </div>
+                    <span className="text-[12px] text-[#6B7280]">
+                      {platformLabel}
+                    </span>
+
+                    <Stars rating={review.rating} />
                   </div>
 
-                  <p className="mt-3 whitespace-pre-line text-[13px] leading-[20px] text-[#374151]">
+                  <p className="mt-2.5 whitespace-pre-line text-[13px] leading-[20px] text-[#374151]">
                     {review.text || "Без текста"}
                   </p>
                 </div>
