@@ -8,8 +8,8 @@ const PLATFORMS = [
   { label: "Яндекс.Карты", value: "yandex_maps", icon: "/Icons/platforms/yandex-maps-logo.svg" },
   { label: "Google Maps", value: "google_maps", icon: "/Icons/platforms/google-maps-sign-logo.svg" },
   { label: "2Gis", value: "2gis", icon: "/Icons/platforms/2gis-icon-logo.svg" },
-  { label: "ПроДокторов", value: "prodoctorov", icon: "/Icons/platforms/prodoctorov_logo.svg" },
-  { label: "НаПоправку", value: "napopravku", icon: "/Icons/platforms/napopravku_logo.svg" },
+  { label: "ПроДокторов", value: "prodoctorov", icon: "/Icons/platforms/prodoktorov.svg" },
+  { label: "НаПоправку", value: "napopravku", icon: "/Icons/platforms/napopravku.svg" },
 ];
 
 const RATINGS = [1, 2, 3, 4, 5];

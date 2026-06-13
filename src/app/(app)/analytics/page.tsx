@@ -46,8 +46,8 @@ function PlatformIcon({ platform }: { platform: string }) {
     yandex_maps: "/Icons/platforms/yandex-maps-logo.svg",
     google_maps: "/Icons/platforms/google-maps-sign-logo.svg",
     "2gis": "/Icons/platforms/2gis-icon-logo.svg",
-    prodoctorov: "/Icons/platforms/prodoctorov_logo.svg",
-    napopravku: "/Icons/platforms/napopravku_logo.svg",
+    prodoctorov: "/Icons/platforms/prodoktorov.svg",
+    napopravku: "/Icons/platforms/napopravku.svg",
   };
 
   const src = iconMap[platform];

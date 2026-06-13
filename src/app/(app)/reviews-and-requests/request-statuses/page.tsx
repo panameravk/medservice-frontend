@@ -79,11 +79,11 @@ const PLATFORM_META: Record<
   },
   prodoctorov: {
     label: "ПроДокторов",
-    icon: "/Icons/platforms/prodoctorov_logo.svg",
+    icon: "/Icons/platforms/prodoktorov.svg",
   },
   napopravku: {
     label: "НаПоправку",
-    icon: "/Icons/platforms/napopravku_logo.svg",
+    icon: "/Icons/platforms/napopravku.svg",
   },
 };
 
