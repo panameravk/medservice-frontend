@@ -4,25 +4,10 @@ import { useEffect, useState } from "react";
 import {
   ApiError,
   getComplaints,
-  getReviews,
   resolveComplaint,
   type Complaint,
-  type Review,
 } from "../../../lib/api";
 import { useBranchesStore } from "../../../lib/branchesStore";
-
-type FeedItem =
-  | { kind: "complaint"; data: Complaint }
-  | { kind: "review"; data: Review };
-
-const PLATFORMS: Record<string, string> = {
-  yandex_maps: "Яндекс.Карты",
-  google_maps: "Google Maps",
-  "2gis": "2ГИС",
-  prodoctorov: "ПроДокторов",
-  napopravku: "НаПоправку",
-  other: "Другое",
-};
 
 const PAGE_SIZE = 20;
 
@@ -56,14 +41,6 @@ function StatusBadge({ resolved }: { resolved: boolean }) {
   );
 }
 
-function PlatformBadge({ platform }: { platform: string }) {
-  return (
-    <span className="inline-flex h-6 shrink-0 items-center justify-center rounded-[6px] bg-[#F3F4F6] px-2.5 text-[11px] font-medium text-[#6B7280]">
-      {PLATFORMS[platform] ?? platform}
-    </span>
-  );
-}
-
 function formatDate(value: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleDateString("ru-RU", {
@@ -91,7 +68,10 @@ async function fetchAllPages<T>(
 export default function InterceptedComplaintsPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
 
-  const [allItems, setAllItems] = useState<FeedItem[]>([]);
+  // Только жалобы, оставленные пациентом через мини-приложение (clinic) —
+  // негатив «директору». Спарсенные негативные отзывы с площадок сюда НЕ
+  // попадают: они видны в «Опубликованных отзывах» и в аналитике.
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -100,7 +80,7 @@ export default function InterceptedComplaintsPage() {
 
   useEffect(() => {
     if (!selectedBranchId) {
-      setAllItems([]);
+      setComplaints([]);
       setError(null);
       setLoading(false);
       setPage(1);
@@ -116,41 +96,19 @@ export default function InterceptedComplaintsPage() {
         setActionError(null);
         setPage(1);
 
-        const [complaintsList, reviewsList] = await Promise.all([
-          fetchAllPages<Complaint>((offset) =>
-            getComplaints({ branchId: selectedBranchId, limit: 500, offset }).then(
-              (r) => ({ items: r.complaints, total: r.total })
-            )
-          ),
-          fetchAllPages<Review>((offset) =>
-            getReviews({
-              branchId: selectedBranchId,
-              ratingMax: 3,
-              limit: 500,
-              offset,
-            }).then((r) => ({ items: r.reviews, total: r.total }))
-          ),
-        ]);
+        const list = await fetchAllPages<Complaint>((offset) =>
+          getComplaints({ branchId: selectedBranchId, limit: 500, offset }).then(
+            (r) => ({ items: r.complaints, total: r.total })
+          )
+        );
 
         if (cancelled) return;
 
-        const feed: FeedItem[] = [
-          ...complaintsList.map((c): FeedItem => ({ kind: "complaint", data: c })),
-          ...reviewsList.map((r): FeedItem => ({ kind: "review", data: r })),
-        ];
-
-        feed.sort((a, b) => {
-          const dateA =
-            a.kind === "complaint" ? a.data.createdAt : (a.data.publishedAt ?? "");
-          const dateB =
-            b.kind === "complaint" ? b.data.createdAt : (b.data.publishedAt ?? "");
-          return dateB.localeCompare(dateA);
-        });
-
-        setAllItems(feed);
+        list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        setComplaints(list);
       } catch {
         if (cancelled) return;
-        setAllItems([]);
+        setComplaints([]);
         setError("Не удалось загрузить данные");
       } finally {
         if (!cancelled) setLoading(false);
@@ -170,12 +128,8 @@ export default function InterceptedComplaintsPage() {
 
     try {
       const updated = await resolveComplaint(id, resolved);
-      setAllItems((prev) =>
-        prev.map((item) =>
-          item.kind === "complaint" && item.data.id === id
-            ? { kind: "complaint", data: updated }
-            : item
-        )
+      setComplaints((prev) =>
+        prev.map((item) => (item.id === id ? updated : item))
       );
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
@@ -196,8 +150,8 @@ export default function InterceptedComplaintsPage() {
     );
   }
 
-  const totalPages = Math.ceil(allItems.length / PAGE_SIZE);
-  const pageItems = allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.ceil(complaints.length / PAGE_SIZE);
+  const pageItems = complaints.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="min-h-[420px]">
@@ -215,74 +169,48 @@ export default function InterceptedComplaintsPage() {
         </div>
       ) : error ? (
         <div className="px-6 py-8 text-[13px] text-[#DC2626]">{error}</div>
-      ) : allItems.length === 0 ? (
+      ) : complaints.length === 0 ? (
         <div className="px-6 py-8 text-[13px] text-[#9CA3AF]">
-          Нет жалоб и низких оценок
+          Нет жалоб
         </div>
       ) : (
         <>
           <div className="divide-y divide-[#EEF2F7]">
-            {pageItems.map((item) => {
-              if (item.kind === "complaint") {
-                const complaint = item.data;
-                const displayName =
-                  complaint.clientName || complaint.clientPhone || "Без имени";
-                const isUpdating = updatingId === complaint.id;
+            {pageItems.map((complaint) => {
+              const displayName =
+                complaint.clientName || complaint.clientPhone || "Без имени";
+              const isUpdating = updatingId === complaint.id;
 
-                return (
-                  <div key={`c-${complaint.id}`} className="px-6 py-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="text-[14px] font-semibold leading-5 text-[#111827]">
-                          {displayName}
-                        </div>
-                        <div className="mt-1 text-[12px] leading-4 text-[#9CA3AF]">
-                          {formatDate(complaint.createdAt)}
-                          {complaint.branchName ? ` · ${complaint.branchName}` : ""}
-                          {complaint.rating ? ` · ★ ${complaint.rating}` : ""}
-                        </div>
-                      </div>
-                      <StatusBadge resolved={complaint.resolved} />
-                    </div>
-
-                    <p className="mt-3 whitespace-pre-line text-[13px] leading-[20px] text-[#374151]">
-                      {complaint.text}
-                    </p>
-
-                    {!complaint.resolved && (
-                      <button
-                        type="button"
-                        onClick={() => handleResolve(complaint.id, true)}
-                        disabled={isUpdating}
-                        className="mt-4 inline-flex h-9 items-center justify-center rounded-[8px] border border-[#E5E7EB] px-3.5 text-[12px] font-medium text-[#6B7280] transition hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isUpdating ? "Сохранение..." : "Отметить решённой"}
-                      </button>
-                    )}
-                  </div>
-                );
-              }
-
-              const review = item.data;
               return (
-                <div key={`r-${review.id}`} className="px-6 py-5">
+                <div key={`c-${complaint.id}`} className="px-6 py-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="text-[14px] font-semibold leading-5 text-[#111827]">
-                        {review.reviewerName || "Аноним"}
+                        {displayName}
                       </div>
                       <div className="mt-1 text-[12px] leading-4 text-[#9CA3AF]">
-                        {formatDate(review.publishedAt)}
-                        {review.branchName ? ` · ${review.branchName}` : ""}
-                        {` · ★ ${review.rating}`}
+                        {formatDate(complaint.createdAt)}
+                        {complaint.branchName ? ` · ${complaint.branchName}` : ""}
+                        {complaint.rating ? ` · ★ ${complaint.rating}` : ""}
                       </div>
                     </div>
-                    <PlatformBadge platform={review.platform} />
+                    <StatusBadge resolved={complaint.resolved} />
                   </div>
 
                   <p className="mt-3 whitespace-pre-line text-[13px] leading-[20px] text-[#374151]">
-                    {review.text || "Без текста"}
+                    {complaint.text}
                   </p>
+
+                  {!complaint.resolved && (
+                    <button
+                      type="button"
+                      onClick={() => handleResolve(complaint.id, true)}
+                      disabled={isUpdating}
+                      className="mt-4 inline-flex h-9 items-center justify-center rounded-[8px] border border-[#E5E7EB] px-3.5 text-[12px] font-medium text-[#6B7280] transition hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isUpdating ? "Сохранение..." : "Отметить решённой"}
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -291,7 +219,7 @@ export default function InterceptedComplaintsPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-[#EEF2F7] px-6 py-4">
               <span className="text-[12px] text-[#9CA3AF]">
-                {allItems.length} записей · страница {page} из {totalPages}
+                {complaints.length} записей · страница {page} из {totalPages}
               </span>
 
               <div className="flex items-center gap-1">
@@ -306,10 +234,7 @@ export default function InterceptedComplaintsPage() {
 
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
                   .filter(
-                    (p) =>
-                      p === 1 ||
-                      p === totalPages ||
-                      Math.abs(p - page) <= 2
+                    (p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2
                   )
                   .reduce<(number | "…")[]>((acc, p, idx, arr) => {
                     if (idx > 0 && p - (arr[idx - 1] as number) > 1)

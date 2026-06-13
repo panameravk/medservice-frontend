@@ -194,7 +194,28 @@ function PlatformBadge({ request }: { request: ReviewRequest }) {
     return <span className="text-[#B8B8B8]">—</span>;
   }
 
-  const content = (
+  // Отзыв опубликован и у нас есть ссылка на него в картах — явная кнопка,
+  // ведёт прямо на отзыв на площадке.
+  if (reviewUrl) {
+    return (
+      <a
+        href={reviewUrl}
+        target="_blank"
+        rel="noreferrer"
+        title={`Открыть отзыв на ${meta.label}`}
+        className="inline-flex h-[24px] items-center gap-[6px] rounded-[4px] border border-[#111111] bg-white px-[10px] text-[11px] font-medium text-[#111111] transition-colors hover:bg-[#111111] hover:text-white"
+      >
+        {meta.icon ? (
+          <img src={meta.icon} alt="" className="h-[14px] w-[14px] shrink-0" />
+        ) : null}
+        <span>Читать отзыв</span>
+        <span aria-hidden>↗</span>
+      </a>
+    );
+  }
+
+  // Платформа известна, но ссылки на опубликованный отзыв ещё нет.
+  return (
     <span className="inline-flex h-[24px] items-center gap-[7px] rounded-[4px] border border-[#E7E7E7] bg-white px-[10px] text-[11px] text-[#9B9B9B]">
       {meta.icon ? (
         <img src={meta.icon} alt="" className="h-[14px] w-[14px] shrink-0" />
@@ -202,16 +223,6 @@ function PlatformBadge({ request }: { request: ReviewRequest }) {
       <span>{meta.label}</span>
     </span>
   );
-
-  if (reviewUrl) {
-    return (
-      <a href={reviewUrl} target="_blank" rel="noreferrer">
-        {content}
-      </a>
-    );
-  }
-
-  return content;
 }
 
 function FilterChip({
