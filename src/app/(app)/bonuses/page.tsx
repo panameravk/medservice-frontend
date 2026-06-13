@@ -10,7 +10,7 @@ import {
   createBranchBonus,
   deleteBranchBonus,
   getBranchBonuses,
-  updateBranch,
+  updateBranchIdentity,
   updateBranchBonus,
   type BranchBonus,
 } from "../../lib/api";
@@ -231,18 +231,25 @@ function BranchIdentityCard({ branchId }: { branchId: string }) {
 
   const [name, setName] = useState(selectedBranch?.name ?? "");
   const [city, setCity] = useState(selectedBranch?.city ?? "");
-  // Logo is preview-only for now (no backend column yet) — kept in local state.
-  const [logo, setLogo] = useState<string | null>(null);
+  // Patient-facing logo (base64 data URL) — persisted to the branch and shown on
+  // the mini tile. Seeded from the store so it survives reloads/branch switches.
+  const [logo, setLogo] = useState<string | null>(
+    selectedBranch?.logoUrl ?? null
+  );
   const [saved, setSaved] = useState(false);
 
   const cityOptions = BASE_CITIES.includes(city) || !city
     ? BASE_CITIES
     : [city, ...BASE_CITIES];
 
-  const persist = async (patch: { name?: string; city?: string | null }) => {
+  const persist = async (patch: {
+    name?: string;
+    city?: string | null;
+    logoUrl?: string | null;
+  }) => {
     if (!selectedBranch) return;
     try {
-      const updated = await updateBranch(selectedBranch.id, patch);
+      const updated = await updateBranchIdentity(selectedBranch.id, patch);
       updateBranchInStore(updated);
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1800);
@@ -261,6 +268,13 @@ function BranchIdentityCard({ branchId }: { branchId: string }) {
   const saveCity = (next: string) => {
     setCity(next);
     if (next !== (selectedBranch?.city ?? "")) void persist({ city: next });
+  };
+
+  const saveLogo = (next: string | null) => {
+    setLogo(next);
+    if (next !== (selectedBranch?.logoUrl ?? null)) {
+      void persist({ logoUrl: next });
+    }
   };
 
   return (
@@ -298,7 +312,7 @@ function BranchIdentityCard({ branchId }: { branchId: string }) {
           <label className={labelCls}>
             Логотип (размер: 40×40 px, формат: .png)
           </label>
-          <LogoUploader value={logo} onChange={setLogo} />
+          <LogoUploader value={logo} onChange={saveLogo} />
         </div>
       </div>
 

@@ -6,6 +6,7 @@ export interface Branch {
   address: string | null;
   city: string | null;
   phone: string | null;
+  logoUrl: string | null;
   timezone: string;
   specialization: string;
   requestFrequencyDays: number;
@@ -24,6 +25,7 @@ type BranchDto = {
   address: string | null;
   city: string | null;
   phone: string | null;
+  logoUrl: string | null;
   timezone: string;
   specialization: string;
   requestFrequencyDays: number;
@@ -99,6 +101,29 @@ export async function updateBranch(
   const response = await apiFetch<BranchDto>(`/branches/${branchId}`, {
     method: "PATCH",
     body: toBranchUpdateDto(data),
+  });
+
+  return mapBranchDto(response);
+}
+
+/**
+ * Patient-facing storefront fields (name / city / logo) — a separate, narrower
+ * endpoint than updateBranch so a branch manager (not just a superuser) can edit
+ * what the patient sees in the mini without touching billing/settings fields.
+ * logoUrl is a base64 data URL (PNG) or null to clear it.
+ */
+export async function updateBranchIdentity(
+  branchId: string,
+  data: { name?: string; city?: string | null; logoUrl?: string | null }
+): Promise<Branch> {
+  const dto: Record<string, unknown> = {};
+  if ("name" in data) dto.name = data.name;
+  if ("city" in data) dto.city = data.city;
+  if ("logoUrl" in data) dto.logo_url = data.logoUrl;
+
+  const response = await apiFetch<BranchDto>(`/branches/${branchId}/identity`, {
+    method: "PATCH",
+    body: dto,
   });
 
   return mapBranchDto(response);

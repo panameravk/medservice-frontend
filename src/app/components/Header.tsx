@@ -311,7 +311,7 @@ export function Header() {
                     className="mt-4 flex h-10 w-full cursor-pointer items-center gap-3 rounded-[10px] px-3 text-[14px] text-[#000000] transition hover:bg-[#F3F4F6]"
                   >
                     <Image
-                      src="/icons/setup-account_logo.svg"
+                      src="/Icons/setup-account_logo.svg"
                       alt="Настроить аккаунт"
                       width={32}
                       height={32}
