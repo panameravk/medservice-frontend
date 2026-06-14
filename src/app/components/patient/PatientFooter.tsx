@@ -14,13 +14,23 @@ export default function PatientFooter() {
           </div>
 
           <div className="mt-[4px] flex justify-center gap-[18px] text-[7px] leading-none text-[#6F6F6F]">
-            <span className="border-b border-dotted border-[#6F6F6F]">
-              Публичная оферта
-            </span>
+            <a
+              href="https://fdbck.ru/privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border-b border-dotted border-[#6F6F6F]"
+            >
+              Пользовательское соглашение
+            </a>
 
-            <span className="border-b border-dotted border-[#6F6F6F]">
-              Политика конфиденциальности
-            </span>
+            <a
+              href="https://fdbck.ru/cookie-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border-b border-dotted border-[#6F6F6F]"
+            >
+              Политика использования файлов Cookie
+            </a>
           </div>
         </div>
       </div>

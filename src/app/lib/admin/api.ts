@@ -10,6 +10,7 @@ interface BranchDto {
   specialization: string;
   timezone: string;
   requestFrequencyDays: number;
+  smsMonthlyLimit: number | null;
   complaintEmails: string[];
   reminderEmails: string[];
   platformUrls: Record<string, string>;
@@ -47,6 +48,7 @@ function mapBranch(b: BranchDto): AdminBranch {
     specialization: b.specialization,
     timezone: b.timezone,
     requestFrequencyDays: b.requestFrequencyDays,
+    smsMonthlyLimit: b.smsMonthlyLimit ?? null,
     complaintEmails: b.complaintEmails ?? [],
     reminderEmails: b.reminderEmails ?? [],
     platformUrls: b.platformUrls ?? {},
@@ -126,6 +128,7 @@ export const adminBranchesApi = {
       specialization: string;
       timezone: string;
       requestFrequencyDays: number;
+      smsMonthlyLimit: number | null;
       paidUntil: string | null;
       complaintEmails: string[];
       reminderEmails: string[];
@@ -141,6 +144,8 @@ export const adminBranchesApi = {
     if ("timezone" in payload) body.timezone = payload.timezone;
     if ("requestFrequencyDays" in payload)
       body.request_frequency_days = payload.requestFrequencyDays;
+    if ("smsMonthlyLimit" in payload)
+      body.sms_monthly_limit = payload.smsMonthlyLimit;
     if ("paidUntil" in payload) body.paid_until = payload.paidUntil;
     if ("complaintEmails" in payload) body.complaint_emails = payload.complaintEmails;
     if ("reminderEmails" in payload) body.reminder_emails = payload.reminderEmails;
@@ -175,8 +180,9 @@ export const adminAccessApi = {
     role: string | null;
     email: string;
     phone: string | null;
-    branchIds?: number[];
   }): Promise<AdminAccessUser> {
+    // Эта страница создаёт только администраторов — у суперпользователя доступ
+    // ко всем филиалам автоматически (branch_ids не нужны).
     const user = await apiFetch<UserDto>("/admin/users", {
       ...ADMIN_SESSION,
       method: "POST",
@@ -187,7 +193,8 @@ export const adminAccessApi = {
         full_name: payload.fullName,
         phone: payload.phone,
         role: payload.role,
-        branch_ids: payload.branchIds ?? [],
+        is_superuser: true,
+        branch_ids: [],
       },
     });
     return mapUser(user);

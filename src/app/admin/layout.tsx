@@ -36,17 +36,21 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </span>
 
                 <a
-                  href="#"
+                  href="https://fdbck.ru/privacy-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-[#9CA3AF] underline decoration-dotted underline-offset-4"
                 >
-                  Лицензия
+                  Пользовательское соглашение
                 </a>
 
                 <a
-                  href="#"
+                  href="https://fdbck.ru/cookie-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-[#9CA3AF] underline decoration-dotted underline-offset-4"
                 >
-                  Политика конфиденциальности
+                  Политика использования файлов Cookie
                 </a>
               </div>
             </footer>

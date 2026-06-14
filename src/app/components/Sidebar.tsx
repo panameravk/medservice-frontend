@@ -5,10 +5,8 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useBranchesStore } from "../lib/branchesStore";
-import { getAnalytics } from "../lib/api";
+import { getRequestUsage, type RequestUsage } from "../lib/api";
 import { Brand } from "./Brand";
-
-const MONTHLY_LIMIT = 150;
 
 const nav = [
   {
@@ -37,11 +35,11 @@ export function Sidebar() {
   const pathname = usePathname();
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
 
-  const [sent, setSent] = useState<number | null>(null);
+  const [usage, setUsage] = useState<RequestUsage | null>(null);
 
   useEffect(() => {
     if (!selectedBranchId) {
-      setSent(null);
+      setUsage(null);
       return;
     }
 
@@ -49,13 +47,13 @@ export function Sidebar() {
 
     const loadUsage = async () => {
       try {
-        const data = await getAnalytics(selectedBranchId, "30");
+        const data = await getRequestUsage(selectedBranchId);
         if (!cancelled) {
-          setSent(data.sent);
+          setUsage(data);
         }
       } catch {
         if (!cancelled) {
-          setSent(null);
+          setUsage(null);
         }
       }
     };
@@ -119,11 +117,15 @@ export function Sidebar() {
 
         <div className="mt-auto px-2 pt-6 text-[11px] leading-4 text-[#6B7280]">
           {selectedBranchId ? (
-            sent !== null ? (
-              <>
-                Отправлено {sent} запросов из {MONTHLY_LIMIT} за последние 30
-                дней
-              </>
+            usage !== null ? (
+              usage.limit > 0 ? (
+                <>
+                  Отправлено {usage.sentThisMonth} из {usage.limit} запросов в
+                  этом месяце
+                </>
+              ) : (
+                <>Отправлено {usage.sentThisMonth} запросов в этом месяце</>
+              )
             ) : (
               "Загрузка..."
             )

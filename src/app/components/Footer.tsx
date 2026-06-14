@@ -8,17 +8,21 @@ export function Footer({ className = "" }: { className?: string }) {
           </span>
 
           <a
-            href="#"
+            href="https://fdbck.ru/privacy-policy"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-[#9CA3AF] underline decoration-transparent underline-offset-4 hover:decoration-[#9CA3AF]"
           >
-            Лицензия
+            Пользовательское соглашение
           </a>
 
           <a
-            href="#"
+            href="https://fdbck.ru/cookie-policy"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-[#9CA3AF] underline decoration-transparent underline-offset-4 hover:decoration-[#9CA3AF]"
           >
-            Политика конфиденциальности
+            Политика использования файлов Cookie
           </a>
         </div>
       </div>

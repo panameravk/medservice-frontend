@@ -7,7 +7,9 @@ import {
   blacklistApi,
   createRequest,
   employeesApi,
+  getRequestUsage,
   type Employee,
+  type RequestUsage,
 } from "../../lib/api";
 import { useBranchesStore } from "../../lib/branchesStore";
 
@@ -151,6 +153,7 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
     reason: string;
     link: string | null;
   } | null>(null);
+  const [usage, setUsage] = useState<RequestUsage | null>(null);
 
   const [blLastName, setBlLastName] = useState("");
   const [blFirstName, setBlFirstName] = useState("");
@@ -197,6 +200,21 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
     };
   }, [branchId]);
 
+  // Счётчик «X из Y» — отправлено за месяц / лимит тарифа филиала.
+  useEffect(() => {
+    let cancelled = false;
+
+    getRequestUsage(branchId)
+      .then((u) => {
+        if (!cancelled) setUsage(u);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [branchId]);
+
   const toggleEmployee = (id: number) => {
     setSelectedEmployees((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
@@ -234,6 +252,11 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
       } else {
         setRequestSuccess(true);
       }
+
+      // Запрос создан — обновляем счётчик «X из Y» (растёт даже если SMS не ушла).
+      void getRequestUsage(branchId)
+        .then(setUsage)
+        .catch(() => {});
     } catch (error) {
       if (error instanceof ApiError) {
         setRequestError(error.message);
@@ -401,6 +424,14 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
             >
               {requestLoading ? "Отправка..." : "Отправить запрос"}
             </button>
+
+            {usage && (
+              <p className="text-center text-[12px] text-[#9CA3AF]">
+                {usage.limit > 0
+                  ? `${usage.sentThisMonth} из ${usage.limit} запросов в этом месяце`
+                  : `${usage.sentThisMonth} запросов в этом месяце`}
+              </p>
+            )}
           </div>
         </div>
 

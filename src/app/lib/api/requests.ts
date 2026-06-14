@@ -40,6 +40,16 @@ export async function getRequests(params: {
   );
 }
 
+export interface RequestUsage {
+  sentThisMonth: number;
+  limit: number;
+}
+
+/** Monthly request-quota usage for a branch — drives the «X из Y» counter. */
+export async function getRequestUsage(branchId: string): Promise<RequestUsage> {
+  return apiFetch<RequestUsage>(`/requests/usage${buildQuery({ branchId })}`);
+}
+
 export interface SmsResult {
   ok: boolean;
   test: boolean;

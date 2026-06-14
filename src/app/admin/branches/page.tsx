@@ -195,7 +195,7 @@ export default function AdminBranchesPage() {
       )}
 
       <AdminShellCard>
-        <div className="grid grid-cols-[1.8fr_0.4fr_0.7fr_1.1fr_0.6fr_0.65fr_0.55fr] items-center border-b border-[#E6E6E6] pb-4 text-[13px] font-medium text-[#222222]">
+        <div className="grid grid-cols-[1.8fr_0.4fr_0.7fr_1.1fr_0.6fr_0.5fr_0.65fr_0.55fr] items-center border-b border-[#E6E6E6] pb-4 text-[13px] font-medium text-[#222222]">
           <div className="flex items-center gap-2">
             <SortIcon />
             Филиал
@@ -207,6 +207,7 @@ export default function AdminBranchesPage() {
           <div>Активность</div>
           <div>Основной контакт</div>
           <div>Сотрудников</div>
+          <div>Тариф</div>
           <div className="flex items-center gap-2">
             <SortIcon />
             Оплачено до
@@ -223,7 +224,7 @@ export default function AdminBranchesPage() {
           {rows.map((item) => (
             <div
               key={item.id}
-              className="grid grid-cols-[1.8fr_0.4fr_0.7fr_1.1fr_0.6fr_0.65fr_0.55fr] items-center py-[14px]"
+              className="grid grid-cols-[1.8fr_0.4fr_0.7fr_1.1fr_0.6fr_0.5fr_0.65fr_0.55fr] items-center py-[14px]"
             >
               <div className="min-w-0 pr-6">
                 <button
@@ -253,6 +254,10 @@ export default function AdminBranchesPage() {
 
               <div className="text-[16px] text-[#3A3A46]">
                 {item.employeesCount}
+              </div>
+
+              <div className="text-[16px] text-[#3A3A46]">
+                {item.smsMonthlyLimit ?? "—"}
               </div>
 
               <div>
@@ -487,6 +492,7 @@ function EditBranchModal({
     city: string | null;
     phone: string | null;
     specialization: string;
+    smsMonthlyLimit: number | null;
     platformUrls: Record<string, string>;
   }) => void;
 }) {
@@ -494,6 +500,9 @@ function EditBranchModal({
   const [city, setCity] = useState(branch.city ?? "");
   const [phone, setPhone] = useState(branch.phone ?? "");
   const [specialization, setSpecialization] = useState(branch.specialization);
+  const [tariff, setTariff] = useState(
+    branch.smsMonthlyLimit != null ? String(branch.smsMonthlyLimit) : ""
+  );
   const [urls, setUrls] = useState<Record<string, string>>({ ...branch.platformUrls });
 
   const inputCls =
@@ -509,11 +518,17 @@ function EditBranchModal({
       const trimmed = v.trim();
       if (trimmed) cleanedUrls[k] = trimmed;
     }
+    const tariffTrimmed = tariff.trim();
+    const tariffNum = tariffTrimmed === "" ? null : Number(tariffTrimmed);
     onSave({
       name: name.trim(),
       city: city.trim() || null,
       phone: phone.trim() || null,
       specialization,
+      smsMonthlyLimit:
+        tariffNum != null && Number.isFinite(tariffNum) && tariffNum >= 0
+          ? tariffNum
+          : null,
       platformUrls: cleanedUrls,
     });
   };
@@ -552,6 +567,23 @@ function EditBranchModal({
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+            Тариф — запросов в месяц
+          </label>
+          <input
+            type="number"
+            min={0}
+            value={tariff}
+            onChange={(e) => setTariff(e.target.value)}
+            placeholder="например, 150"
+            className={inputCls}
+          />
+          <p className="mt-1.5 text-[12px] text-[#A3A3A3]">
+            Лимит SMS-запросов в месяц. Эта цифра показывается в кабинете как «X из Y».
+          </p>
         </div>
 
         <div className="border-t border-[#ECECEC] pt-4">

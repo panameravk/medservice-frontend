@@ -38,6 +38,34 @@ function ChevronDown({ className = "" }: { className?: string }) {
   );
 }
 
+function LockIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+    >
+      <rect
+        x="5"
+        y="11"
+        width="14"
+        height="9"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M8 11V8a4 4 0 1 1 8 0v3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function useOutsideClick(
   refs: Array<RefObject<HTMLElement | null>>,
   onOutside: () => void
@@ -76,6 +104,8 @@ export function Header() {
   const [userEmail, setUserEmail] = useState("");
   const [userPhone, setUserPhone] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  // Роль может менять только суперпользователь — обычный юзер её только видит.
+  const [userIsSuperuser, setUserIsSuperuser] = useState(false);
 
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
 
@@ -101,6 +131,7 @@ export function Header() {
         setUserEmail(user.email);
         setUserPhone(user.phone);
         setUserRole(user.role);
+        setUserIsSuperuser(user.isSuperuser);
       } catch {
         if (cancelled) return;
       }
@@ -397,16 +428,26 @@ export function Header() {
               </div>
 
               <div>
-                <label className="mb-[8px] block text-[13px] font-medium text-[#111827]">
+                <label className="mb-[8px] flex items-center gap-1.5 text-[13px] font-medium text-[#111827]">
                   Роль в команде
+                  {!userIsSuperuser && (
+                    <LockIcon className="h-3.5 w-3.5 text-[#9CA3AF]" />
+                  )}
                 </label>
                 <input
                   type="text"
                   value={accRole}
                   onChange={(e) => setAccRole(e.target.value)}
+                  readOnly={!userIsSuperuser}
+                  disabled={!userIsSuperuser}
                   placeholder="Например, Менеджер"
-                  className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF]"
+                  className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF] disabled:cursor-not-allowed disabled:text-[#9CA3AF]"
                 />
+                {!userIsSuperuser && (
+                  <p className="mt-[6px] text-[12px] leading-snug text-[#9CA3AF]">
+                    Роль назначает администратор.
+                  </p>
+                )}
               </div>
 
               {accError && (

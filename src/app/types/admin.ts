@@ -12,6 +12,7 @@ export type AdminBranch = {
   specialization: string;
   timezone: string;
   requestFrequencyDays: number;
+  smsMonthlyLimit: number | null;
   complaintEmails: string[];
   reminderEmails: string[];
   platformUrls: Record<string, string>;

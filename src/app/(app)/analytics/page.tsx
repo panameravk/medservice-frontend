@@ -817,12 +817,12 @@ export default function AnalyticsPage() {
 
           <aside className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
             <div className="mb-3 text-[14px] font-medium text-[#111827]">
-              Негативные отзывы
+              Последние отзывы
             </div>
 
             <div className="max-h-[calc(100vh-215px)] space-y-4 overflow-y-auto pr-1">
               {dashboard.recentReviews.length === 0 ? (
-                <EmptyState text="Нет негативных отзывов за выбранный период" />
+                <EmptyState text="Нет отзывов за выбранный период" />
               ) : (
                 dashboard.recentReviews.map((review) => (
                   <article key={review.id}>

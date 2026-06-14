@@ -177,8 +177,7 @@ export default function InterceptedComplaintsPage() {
         <>
           <div className="divide-y divide-[#EEF2F7]">
             {pageItems.map((complaint) => {
-              const displayName =
-                complaint.clientName || complaint.clientPhone || "Без имени";
+              const displayName = complaint.clientName || "Без имени";
               const isUpdating = updatingId === complaint.id;
 
               return (
@@ -190,6 +189,7 @@ export default function InterceptedComplaintsPage() {
                       </div>
                       <div className="mt-1 text-[12px] leading-4 text-[#9CA3AF]">
                         {formatDate(complaint.createdAt)}
+                        {complaint.clientPhone ? ` · ${complaint.clientPhone}` : ""}
                         {complaint.branchName ? ` · ${complaint.branchName}` : ""}
                         {complaint.rating ? ` · ★ ${complaint.rating}` : ""}
                       </div>
