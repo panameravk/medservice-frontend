@@ -312,8 +312,8 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
         </p>
       </div>
 
-      <div className="flex items-start gap-5">
-        <div className="min-w-0 flex-1 rounded-[16px] bg-white p-6 shadow-sm">
+      <div className="grid grid-cols-[3fr_1fr] items-start gap-5">
+        <div className="min-w-0 rounded-[16px] bg-white p-6 shadow-sm">
           <div className="space-y-4">
             <div>
               <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
@@ -435,7 +435,7 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
           </div>
         </div>
 
-        <div className="w-[272px] shrink-0 space-y-3 rounded-[16px] bg-[#F3F4F6] p-5">
+        <div className="min-w-0 space-y-3 rounded-[16px] bg-[#F3F4F6] p-5">
           <div>
             <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
               Фамилия

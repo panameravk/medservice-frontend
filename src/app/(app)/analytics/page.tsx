@@ -633,7 +633,7 @@ export default function AnalyticsPage() {
           <div className="h-[210px] rounded-[12px] bg-white/70" />
         </div>
       ) : !dashboard ? null : (
-        <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
           <div className="space-y-4">
             <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
               <div className="grid grid-cols-4 gap-6">
@@ -670,10 +670,10 @@ export default function AnalyticsPage() {
                   <thead>
                     <tr className="text-[15px] font-medium text-[#111827]">
                       <th className="w-[169px] pb-2.5">Площадка</th>
-                      <th className="w-[88px] pb-2.5">Рейтинг</th>
-                      <th className="w-[88px] pb-2.5">Отзывы</th>
-                      <th className="w-[119px] pb-2.5">Всего отзывов</th>
-                      <th className="w-[106px] pb-2.5">Всего негатива</th>
+                      <th className="w-[88px] pb-2.5 text-center">Рейтинг</th>
+                      <th className="w-[88px] pb-2.5 text-center">Отзывы</th>
+                      <th className="w-[119px] pb-2.5 text-center">Всего отзывов</th>
+                      <th className="w-[106px] pb-2.5 text-center">Всего негатива</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -702,13 +702,15 @@ export default function AnalyticsPage() {
                             <span className="truncate">{item.label}</span>
                           </div>
                         </td>
-                        <td className="py-[6px]">
+                        <td className="py-[6px] text-center">
                           <RatingBadge value={item.rating} />
                         </td>
-                        <td className="py-[6px]">{item.reviews}</td>
-                        <td className="py-[6px]">{item.totalReviews}</td>
+                        <td className="py-[6px] text-center">{item.reviews}</td>
+                        <td className="py-[6px] text-center">
+                          {item.totalReviews}
+                        </td>
                         <td className="py-[6px]">
-                          <div className="flex items-center gap-2.5">
+                          <div className="flex items-center justify-center gap-2.5">
                             <span>{item.totalNegative}</span>
                             <NegativeBadge
                               value={Math.round(item.negativePercent)}
