@@ -37,32 +37,30 @@ export default function ReviewsAndRequestsLayout({
         </p>
       </div>
 
-      <div className="rounded-[14px] border border-[#E6E6E6] bg-white">
-        <div className="overflow-hidden rounded-t-[14px]">
-          <div className="grid grid-cols-3 border-b border-[#E6E6E6] bg-[#F7F7F7]">
-            {tabs.map((tab, index) => {
-              const active = pathname === tab.href;
+      <div className="relative z-10 -mb-px inline-flex w-fit overflow-hidden rounded-t-[12px] border border-b-0 border-[#E6E6E6]">
+        {tabs.map((tab, index) => {
+          const active = pathname === tab.href;
 
-              return (
-                <Link
-                  key={tab.href}
-                  href={tab.href}
-                  className={[
-                    "flex h-[54px] items-center justify-center text-center text-[14px] leading-[18px] transition",
-                    index !== tabs.length - 1 ? "border-r border-[#E6E6E6]" : "",
-                    active
-                      ? "bg-white font-medium text-[#222222]"
-                      : "font-normal text-[#3D3D3D] hover:bg-[#F2F2F2]",
-                  ].join(" ")}
-                >
-                  {tab.label}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={[
+                "flex h-[52px] items-center justify-center px-8 text-center text-[14px] leading-[18px] transition",
+                index !== tabs.length - 1 ? "border-r border-[#E6E6E6]" : "",
+                active
+                  ? "bg-white font-medium text-[#222222]"
+                  : "border-b border-[#E6E6E6] bg-[#F7F7F7] font-normal text-[#3D3D3D] hover:bg-[#F2F2F2]",
+              ].join(" ")}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
+      </div>
 
-        <div className="min-h-[520px] rounded-b-[14px]">{children}</div>
+      <div className="min-h-[520px] rounded-[14px] border border-[#E6E6E6] bg-white">
+        {children}
       </div>
     </div>
   );

@@ -711,7 +711,9 @@ export default function AnalyticsPage() {
                         </td>
                         <td className="py-[6px]">
                           <div className="flex items-center justify-center gap-2.5">
-                            <span>{item.totalNegative}</span>
+                            <span className="w-[26px] text-right tabular-nums">
+                              {item.totalNegative}
+                            </span>
                             <NegativeBadge
                               value={Math.round(item.negativePercent)}
                             />
