@@ -203,7 +203,7 @@ function PlatformBadge({ request }: { request: ReviewRequest }) {
         target="_blank"
         rel="noreferrer"
         title={`Открыть отзыв на ${meta.label}`}
-        className="inline-flex h-[24px] items-center gap-[6px] rounded-[4px] border border-[#111111] bg-white px-[10px] text-[11px] font-medium text-[#111111] transition-colors hover:bg-[#111111] hover:text-white"
+        className="inline-flex h-[24px] items-center gap-[6px] rounded-[4px] bg-white px-[10px] text-[11px] font-medium text-[#111111] transition-colors hover:bg-[#F2F2F2]"
       >
         {meta.icon ? (
           <img src={meta.icon} alt="" className="h-[14px] w-[14px] shrink-0" />
