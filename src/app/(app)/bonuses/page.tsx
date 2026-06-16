@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { AdminModal } from "../../components/admin/AdminModal";
 import { AdminSwitch } from "../../components/admin/AdminSwitch";
+import { CustomSelect } from "../../components/CustomSelect";
 import { LogoUploader } from "../../components/LogoUploader";
 import {
   ApiError,
@@ -294,18 +295,11 @@ function BranchIdentityCard({ branchId }: { branchId: string }) {
 
         <div>
           <label className={labelCls}>Город</label>
-          <select
+          <CustomSelect
             value={city}
-            onChange={(e) => saveCity(e.target.value)}
-            className={selectCls}
-          >
-            {!city && <option value="">Выберите</option>}
-            {cityOptions.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            options={cityOptions.map((c) => ({ label: c, value: c }))}
+            onChange={saveCity}
+          />
         </div>
 
         <div>

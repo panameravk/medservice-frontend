@@ -27,18 +27,20 @@ export default function ReviewsAndRequestsLayout({
   const pathname = usePathname();
 
   return (
-    <div className="space-y-4">
-      <div>
+    <div>
+      <div className="mb-5">
         <h1 className="text-[24px] font-bold leading-7 text-[#111827]">
           Отзывы и запросы
         </h1>
         <p className="mt-1 text-[13px] text-[#6B7280]">
           Все отзывы, их статус и история
         </p>
+      </div>
 
-        <div className="mt-4">
-          <div className="flex items-center">
-            {tabs.map((tab) => {
+      <div className="rounded-[14px] border border-[#E6E6E6] bg-white">
+        <div className="overflow-hidden rounded-t-[14px]">
+          <div className="grid grid-cols-3 border-b border-[#E6E6E6] bg-[#F7F7F7]">
+            {tabs.map((tab, index) => {
               const active = pathname === tab.href;
 
               return (
@@ -46,14 +48,11 @@ export default function ReviewsAndRequestsLayout({
                   key={tab.href}
                   href={tab.href}
                   className={[
-                    "flex h-10 items-center justify-center px-5",
-                    "border border-[#E5E7EB]",
-                    "text-[13px] font-medium",
-                    "first:ml-0 first:rounded-l-[12px] last:rounded-r-[12px]",
-                    "-ml-[1px]",
+                    "flex h-[54px] items-center justify-center text-center text-[14px] leading-[18px] transition",
+                    index !== tabs.length - 1 ? "border-r border-[#E6E6E6]" : "",
                     active
-                      ? "bg-white text-[#111827]"
-                      : "bg-[#F3F4F6] text-[#6B7280] hover:bg-[#ECEFF3]",
+                      ? "bg-white font-medium text-[#222222]"
+                      : "font-normal text-[#3D3D3D] hover:bg-[#F2F2F2]",
                   ].join(" ")}
                 >
                   {tab.label}
@@ -62,10 +61,8 @@ export default function ReviewsAndRequestsLayout({
             })}
           </div>
         </div>
-      </div>
 
-      <div className="min-h-[520px] rounded-[12px] border border-[#E5E7EB] bg-white">
-        {children}
+        <div className="min-h-[520px] rounded-b-[14px]">{children}</div>
       </div>
     </div>
   );

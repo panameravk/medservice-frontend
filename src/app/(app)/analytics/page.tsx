@@ -640,7 +640,7 @@ export default function AnalyticsPage() {
                 <MetricStat
                   value={dashboard.sent}
                   labelTop="отправлено"
-                  labelBottom=""
+                  labelBottom="запросов"
                 />
                 <MetricStat
                   value={dashboard.reviews}
