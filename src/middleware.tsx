@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const USER_PUBLIC_PATHS = ["/login", "/forgot-password"];
+const USER_PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password"];
 const USER_HOME = "/branches";
 const ADMIN_LOGIN_PATH = "/admin/login";
 const ADMIN_HOME = "/admin/branches";
@@ -63,6 +63,7 @@ export const config = {
     "/",
     "/login",
     "/forgot-password",
+    "/reset-password",
     "/analytics/:path*",
     "/blacklist/:path*",
     "/bonuses/:path*",

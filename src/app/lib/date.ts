@@ -49,6 +49,6 @@ export const getDateRangeByPeriod = (
   return {
     start,
     end,
-    label: `${formatDate(end)} - ${formatDate(start)}`,
+    label: `${formatDate(start)} - ${formatDate(end)}`,
   };
 };

@@ -1,111 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { PhoneInput } from "../../components/PhoneInput";
 import {
   ApiError,
   blacklistApi,
   createRequest,
   employeesApi,
-  getRequestUsage,
   type Employee,
-  type RequestUsage,
 } from "../../lib/api";
 import { useBranchesStore } from "../../lib/branchesStore";
-
-const COUNTRIES = [
-  { code: "RU", flag: "🇷🇺", dial: "+7", label: "Россия" },
-  { code: "BY", flag: "🇧🇾", dial: "+375", label: "Беларусь" },
-  { code: "KZ", flag: "🇰🇿", dial: "+7", label: "Казахстан" },
-  { code: "UA", flag: "🇺🇦", dial: "+380", label: "Украина" },
-  { code: "UZ", flag: "🇺🇿", dial: "+998", label: "Узбекистан" },
-  { code: "AM", flag: "🇦🇲", dial: "+374", label: "Армения" },
-  { code: "AZ", flag: "🇦🇿", dial: "+994", label: "Азербайджан" },
-  { code: "GE", flag: "🇬🇪", dial: "+995", label: "Грузия" },
-  { code: "KG", flag: "🇰🇬", dial: "+996", label: "Кыргызстан" },
-  { code: "TJ", flag: "🇹🇯", dial: "+992", label: "Таджикистан" },
-  { code: "TM", flag: "🇹🇲", dial: "+993", label: "Туркменистан" },
-  { code: "MD", flag: "🇲🇩", dial: "+373", label: "Молдова" },
-];
-
-function PhoneInput({
-  value,
-  onChange,
-  inputClassName = "bg-transparent",
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  inputClassName?: string;
-}) {
-  const [country, setCountry] = useState(COUNTRIES[0]);
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  return (
-    <div
-      ref={ref}
-      className="relative flex items-center gap-2 rounded-[10px] border border-transparent bg-[#F3F4F6] px-3 py-2.5 focus-within:border-[#D8D8D8]"
-    >
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex shrink-0 cursor-pointer select-none items-center gap-1"
-      >
-        <span className="text-base leading-none">{country.flag}</span>
-        <span className="text-[11px] text-[#6B7280]">▾</span>
-      </button>
-
-      <span className="shrink-0 text-[13px] text-[#6B7280]">
-        {country.dial}
-      </span>
-
-      <input
-        type="tel"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="(000) 000-00-00"
-        className={`min-w-0 flex-1 text-[13px] text-[#111827] placeholder-[#9CA3AF] focus:outline-none ${inputClassName}`}
-      />
-
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-52 overflow-hidden rounded-[10px] border border-[#E5E7EB] bg-white shadow-lg">
-          {COUNTRIES.map((countryItem) => (
-            <button
-              key={countryItem.code}
-              type="button"
-              onClick={() => {
-                setCountry(countryItem);
-                setOpen(false);
-              }}
-              className={`flex w-full items-center gap-2 px-3 py-2 text-[13px] transition-colors hover:bg-[#F3F4F6] ${
-                countryItem.code === country.code
-                  ? "bg-[#FFFBEA] font-medium"
-                  : ""
-              }`}
-            >
-              <span>{countryItem.flag}</span>
-              <span className="w-10 text-left text-[#6B7280]">
-                {countryItem.dial}
-              </span>
-              <span className="text-[#111827]">{countryItem.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function RequestFeedbackPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
@@ -145,6 +50,7 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
   const [lastName, setLastName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneCanonical, setPhoneCanonical] = useState<string | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
   const [requestLoading, setRequestLoading] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -153,11 +59,11 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
     reason: string;
     link: string | null;
   } | null>(null);
-  const [usage, setUsage] = useState<RequestUsage | null>(null);
 
   const [blLastName, setBlLastName] = useState("");
   const [blFirstName, setBlFirstName] = useState("");
   const [blPhone, setBlPhone] = useState("");
+  const [blPhoneCanonical, setBlPhoneCanonical] = useState<string | null>(null);
   const [blReason, setBlReason] = useState("");
   const [blLoading, setBlLoading] = useState(false);
   const [blError, setBlError] = useState<string | null>(null);
@@ -200,21 +106,6 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
     };
   }, [branchId]);
 
-  // Счётчик «X из Y» — отправлено за месяц / лимит тарифа филиала.
-  useEffect(() => {
-    let cancelled = false;
-
-    getRequestUsage(branchId)
-      .then((u) => {
-        if (!cancelled) setUsage(u);
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [branchId]);
-
   const toggleEmployee = (id: number) => {
     setSelectedEmployees((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
@@ -231,12 +122,13 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
       const created = await createRequest({
         branchId: Number(branchId),
         clientName: `${lastName} ${firstName}`.trim(),
-        clientPhone: phone.trim(),
+        clientPhone: phoneCanonical ?? "",
       });
 
       setLastName("");
       setFirstName("");
       setPhone("");
+      setPhoneCanonical(null);
       setSelectedEmployees([]);
 
       // 201 означает «запрос создан», но SMS могла не уйти (отключена,
@@ -253,10 +145,6 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
         setRequestSuccess(true);
       }
 
-      // Запрос создан — обновляем счётчик «X из Y» (растёт даже если SMS не ушла).
-      void getRequestUsage(branchId)
-        .then(setUsage)
-        .catch(() => {});
     } catch (error) {
       if (error instanceof ApiError) {
         setRequestError(error.message);
@@ -279,13 +167,14 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
       await blacklistApi.create(branchId, {
         lastName: blLastName.trim(),
         firstName: blFirstName.trim(),
-        phone: blPhone.trim(),
+        phone: blPhoneCanonical ?? "",
         reason: blReason.trim() || undefined,
       });
 
       setBlLastName("");
       setBlFirstName("");
       setBlPhone("");
+      setBlPhoneCanonical(null);
       setBlReason("");
       setBlSuccess(true);
     } catch (error) {
@@ -312,7 +201,7 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-[3fr_1fr] items-start gap-5">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[2fr_1fr]">
         <div className="min-w-0 rounded-[16px] bg-white p-6 shadow-sm">
           <div className="space-y-4">
             <div>
@@ -343,7 +232,18 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
               <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
                 Телефон
               </label>
-              <PhoneInput value={phone} onChange={setPhone} />
+              <PhoneInput
+                value={phone}
+                onChange={(next, meta) => {
+                  setPhone(next);
+                  setPhoneCanonical(meta.canonical);
+                }}
+              />
+              {phone && !phoneCanonical && (
+                <p className="mt-1 text-[11px] text-red-500">
+                  Введите корректный номер телефона
+                </p>
+              )}
             </div>
 
             <div>
@@ -418,24 +318,17 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
                 requestLoading ||
                 !branchId ||
                 !`${lastName} ${firstName}`.trim() ||
-                !phone.trim()
+                !phoneCanonical
               }
               className="w-full rounded-[10px] bg-[#F4C21A] py-3 text-[13px] font-semibold text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90 disabled:opacity-50"
             >
               {requestLoading ? "Отправка..." : "Отправить запрос"}
             </button>
 
-            {usage && (
-              <p className="text-center text-[12px] text-[#9CA3AF]">
-                {usage.limit > 0
-                  ? `${usage.sentThisMonth} из ${usage.limit} запросов в этом месяце`
-                  : `${usage.sentThisMonth} запросов в этом месяце`}
-              </p>
-            )}
           </div>
         </div>
 
-        <div className="min-w-0 space-y-3 rounded-[16px] bg-[#F3F4F6] p-5">
+        <div className="min-w-0 space-y-3 rounded-[16px] bg-white p-6 shadow-sm">
           <div>
             <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
               Фамилия
@@ -444,7 +337,7 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
               type="text"
               value={blLastName}
               onChange={(e) => setBlLastName(e.target.value)}
-              className="w-full rounded-[10px] border border-transparent bg-white px-3 py-2.5 text-[13px] text-[#111827] placeholder-[#9CA3AF] focus:border-[#D8D8D8] focus:outline-none"
+              className="w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-3 py-2.5 text-[13px] text-[#111827] placeholder-[#9CA3AF] focus:border-[#D8D8D8] focus:outline-none"
             />
           </div>
 
@@ -456,7 +349,7 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
               type="text"
               value={blFirstName}
               onChange={(e) => setBlFirstName(e.target.value)}
-              className="w-full rounded-[10px] border border-transparent bg-white px-3 py-2.5 text-[13px] text-[#111827] placeholder-[#9CA3AF] focus:border-[#D8D8D8] focus:outline-none"
+              className="w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-3 py-2.5 text-[13px] text-[#111827] placeholder-[#9CA3AF] focus:border-[#D8D8D8] focus:outline-none"
             />
           </div>
 
@@ -464,13 +357,19 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
             <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
               Телефон
             </label>
-            <div className="rounded-[10px] border border-transparent bg-white focus-within:border-[#D8D8D8]">
-              <PhoneInput
-                value={blPhone}
-                onChange={setBlPhone}
-                inputClassName="bg-transparent"
-              />
-            </div>
+            <PhoneInput
+              value={blPhone}
+              onChange={(next, meta) => {
+                setBlPhone(next);
+                setBlPhoneCanonical(meta.canonical);
+              }}
+              surfaceClassName="bg-[#F3F4F6]"
+            />
+            {blPhone && !blPhoneCanonical && (
+              <p className="mt-1 text-[11px] text-red-500">
+                Введите корректный номер телефона
+              </p>
+            )}
           </div>
 
           <div>
@@ -481,7 +380,7 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
               value={blReason}
               onChange={(e) => setBlReason(e.target.value)}
               rows={4}
-              className="w-full resize-none rounded-[10px] border border-transparent bg-white px-3 py-2.5 text-[13px] text-[#111827] placeholder-[#9CA3AF] focus:border-[#D8D8D8] focus:outline-none"
+              className="w-full resize-none rounded-[10px] border border-transparent bg-[#F3F4F6] px-3 py-2.5 text-[13px] text-[#111827] placeholder-[#9CA3AF] focus:border-[#D8D8D8] focus:outline-none"
             />
           </div>
 
@@ -502,9 +401,9 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
               !branchId ||
               !blLastName.trim() ||
               !blFirstName.trim() ||
-              !blPhone.trim()
+              !blPhoneCanonical
             }
-            className="w-full rounded-[10px] bg-[#111827] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#1f2937] active:brightness-90 disabled:opacity-50"
+            className="w-full rounded-[10px] bg-black py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#1F2937] active:brightness-90 disabled:opacity-50"
           >
             {blLoading ? "Отправка..." : "Отправить в черный список"}
           </button>

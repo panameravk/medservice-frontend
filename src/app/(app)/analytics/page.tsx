@@ -9,9 +9,10 @@ import {
   Tooltip,
   XAxis,
 } from "recharts";
-import { getDashboard, type DashboardData, type Period } from "../../lib/api";
+import { DateRangeControl } from "../../components/DateRangeControl";
+import { getDashboard, type DashboardData } from "../../lib/api";
 import { useBranchesStore } from "../../lib/branchesStore";
-import { getDateRangeByPeriod } from "../../lib/date";
+import { getDateRangeByPeriod, type Period } from "../../lib/date";
 
 function EmptyState({ text }: { text: string }) {
   return <p className="text-[13px] text-[#9CA3AF]">{text}</p>;
@@ -371,101 +372,23 @@ function ReviewStars({ rating }: { rating: number }) {
 export default function AnalyticsPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
 
-  const [period, setPeriod] = useState<Period>("30");
+  const [activePreset, setActivePreset] = useState<Period | null>("30");
   const [currentDate, setCurrentDate] = useState(() => new Date());
 
   const toISODate = (d: Date) => d.toISOString().slice(0, 10);
-  const [useCustomRange, setUseCustomRange] = useState(false);
   const [dateFrom, setDateFrom] = useState(() =>
-    toISODate(getDateRangeByPeriod(period, currentDate).start)
+    toISODate(getDateRangeByPeriod("30", currentDate).start)
   );
   const [dateTo, setDateTo] = useState(() =>
-    toISODate(getDateRangeByPeriod(period, currentDate).end)
+    toISODate(getDateRangeByPeriod("30", currentDate).end)
   );
 
-  const formatRu = (iso: string) => {
-    if (!iso) return "—";
-    const [y, m, d] = iso.split("-");
-    if (!y || !m || !d) return iso;
-    return `${d}.${m}.${y}`;
-  };
-
-  function CalendarIcon({ className = "" }: { className?: string }) {
-    return (
-      <svg
-        className={className}
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-      >
-        <path
-          d="M7 3v3M17 3v3"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <path
-          d="M4 8h16"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <rect
-          x="5"
-          y="5"
-          width="14"
-          height="16"
-          rx="2"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
-      </svg>
-    );
-  }
-
-  function DateField({
-    value,
-    onChange,
-  }: {
-    value: string;
-    onChange: (next: string) => void;
-  }) {
-    return (
-      <div className="relative flex h-10 w-[150px] items-center justify-between gap-2 rounded-[10px] border border-[#E5E7EB] bg-white px-3 text-[13px] text-[#111827] shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-        <span className="tabular-nums">{formatRu(value)}</span>
-        <CalendarIcon className="text-[#9CA3AF]" />
-        <input
-          type="date"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          // Native date inputs only open the calendar from the right-edge
-          // indicator, so clicking the text/icon did nothing. Open the picker
-          // programmatically on any click across the field (and suppress the
-          // native double-open). Falls back to default behaviour if unsupported.
-          onClick={(e) => {
-            const el = e.currentTarget;
-            if (typeof el.showPicker === "function") {
-              e.preventDefault();
-              try {
-                el.showPicker();
-              } catch {
-                /* showPicker can throw outside a user gesture — ignore */
-              }
-            }
-          }}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        />
-      </div>
-    );
-  }
-
   useEffect(() => {
-    if (useCustomRange) return;
-    const next = getDateRangeByPeriod(period, currentDate);
+    if (activePreset === null) return;
+    const next = getDateRangeByPeriod(activePreset, currentDate);
     setDateFrom(toISODate(next.start));
     setDateTo(toISODate(next.end));
-  }, [currentDate, period, useCustomRange]);
+  }, [activePreset, currentDate]);
 
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -504,8 +427,9 @@ export default function AnalyticsPage() {
       return;
     }
 
-    if (useCustomRange && dateFrom && dateTo && dateFrom > dateTo) {
-      // Не делаем запрос в "перевёрнутом" диапазоне
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      setError("Дата начала не может быть позже даты окончания");
+      setLoading(false);
       return;
     }
 
@@ -518,7 +442,9 @@ export default function AnalyticsPage() {
 
         const data = await getDashboard(
           selectedBranchId,
-          useCustomRange ? { start: dateFrom, end: dateTo } : { period }
+          activePreset !== null
+            ? { period: activePreset }
+            : { start: dateFrom, end: dateTo }
         );
 
         if (!cancelled) {
@@ -547,18 +473,10 @@ export default function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [dateFrom, dateTo, period, selectedBranchId, useCustomRange]);
+  }, [activePreset, dateFrom, dateTo, selectedBranchId]);
 
   if (!selectedBranchId) {
     return <p className="text-sm text-[#9CA3AF]">Сначала выберите филиал</p>;
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-[12px] border border-[#FECACA] bg-[#FEF2F2] p-4 text-sm text-[#B91C1C]">
-        {error}
-      </div>
-    );
   }
 
   return (
@@ -571,54 +489,31 @@ export default function AnalyticsPage() {
           Динамика рейтинга и репутации
         </p>
 
-        <div className="mt-4 flex items-center gap-[14px]">
-          <div className="flex h-10 overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
-            {(["week", "30", "90", "year"] as Period[]).map((value) => {
-              const active = period === value;
+        <DateRangeControl
+          activePreset={activePreset}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          className="mt-4"
+          onPresetChange={(value, range) => {
+            setActivePreset(value);
+            setDateFrom(range.start);
+            setDateTo(range.end);
+          }}
+          onDateFromChange={(next) => {
+            setActivePreset(null);
+            setDateFrom(next);
+          }}
+          onDateToChange={(next) => {
+            setActivePreset(null);
+            setDateTo(next);
+          }}
+        />
 
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => {
-                    setPeriod(value);
-                    setUseCustomRange(false);
-                  }}
-                  className={[
-                    "px-4 text-[13px]",
-                    active
-                      ? "bg-[#F3F4F6] font-medium text-[#111827]"
-                      : "text-[#9CA3AF] hover:bg-black/[0.02]",
-                  ].join(" ")}
-                >
-                  {value === "week"
-                    ? "Неделя"
-                    : value === "year"
-                    ? "Год"
-                    : `${value} дней`}
-                </button>
-              );
-            })}
+        {error && (
+          <div className="mt-3 rounded-[12px] border border-[#FECACA] bg-[#FEF2F2] p-4 text-sm text-[#B91C1C]">
+            {error}
           </div>
-
-          <div className="flex items-center gap-2">
-            <DateField
-              value={dateFrom}
-              onChange={(next) => {
-                setUseCustomRange(true);
-                setDateFrom(next);
-              }}
-            />
-            <span className="text-[13px] text-[#9CA3AF]">—</span>
-            <DateField
-              value={dateTo}
-              onChange={(next) => {
-                setUseCustomRange(true);
-                setDateTo(next);
-              }}
-            />
-          </div>
-        </div>
+        )}
       </div>
 
       {loading && !dashboard ? (
@@ -824,7 +719,7 @@ export default function AnalyticsPage() {
               Последние отзывы
             </div>
 
-            <div className="max-h-[calc(100vh-215px)] space-y-4 overflow-y-auto pr-1">
+            <div className="space-y-4">
               {dashboard.recentReviews.length === 0 ? (
                 <EmptyState text="Нет отзывов за выбранный период" />
               ) : (

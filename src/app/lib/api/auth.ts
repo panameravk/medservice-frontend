@@ -88,6 +88,13 @@ export const authApi = {
       auth: false,
       body: { email },
     }),
+
+  resetPassword: (token: string, password: string) =>
+    apiFetch<{ message: string }>("/auth/reset-password", {
+      method: "POST",
+      auth: false,
+      body: { token, password },
+    }),
 };
 
 export const adminAuthApi = {
