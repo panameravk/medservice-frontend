@@ -81,12 +81,7 @@ export default function AdminBranchesPage() {
   const [editingBranch, setEditingBranch] = useState<AdminBranch | null>(null);
   const [deletingBranch, setDeletingBranch] = useState<AdminBranch | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (searchParams.get("create") === "1") {
-      setCreateOpen(true);
-    }
-  }, [searchParams]);
+  const createVisible = createOpen || searchParams.get("create") === "1";
 
   useEffect(() => {
     void adminBranchesApi.getAll().then(setItems);
@@ -293,7 +288,7 @@ export default function AdminBranchesPage() {
         </div>
       </AdminShellCard>
 
-      {createOpen && (
+      {createVisible && (
         <CreateBranchModal
           onClose={closeCreate}
           onSave={onCreate}

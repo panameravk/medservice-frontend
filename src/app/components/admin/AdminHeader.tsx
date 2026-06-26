@@ -48,27 +48,29 @@ export function AdminHeader() {
     router.push("/login");
   };
 
+  const displayName = account?.fullName ?? account?.username ?? "Администратор";
+
   return (
-    <div className="px-5 pt-5">
+    <div className="px-6 pt-5">
       <div className="relative">
-        <div className="flex h-[56px] items-center rounded-[14px] border border-[#E6E6E6] bg-white px-4 text-[15px] text-[#2F2F37] shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+        <div className="flex h-15 items-center rounded-[12px] border border-[#E5E7EB] bg-white px-4 text-[15px] text-[#111827] shadow-[0_1px_0_rgba(0,0,0,0.02)]">
           Администраторский аккаунт
         </div>
 
         <div
           ref={containerRef}
-          className="absolute right-[6px] top-[4px]"
+          className="absolute right-1.5 top-[6px]"
         >
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="h-[48px] w-[190px] rounded-[10px] border border-[#E5E7EB] bg-[#2B2E39] px-5 text-[14px] font-medium text-white shadow-[0_6px_18px_rgba(17,24,39,0.08)] transition hover:opacity-90"
+            className="h-12 w-[220px] cursor-pointer rounded-[10px] border border-[#E5E7EB] bg-[#2B2E39] px-5 text-[14px] font-medium text-white shadow-[0_6px_18px_rgba(17,24,39,0.08)] transition hover:opacity-90"
           >
-            Администратор
+            {displayName}
           </button>
 
           {open && account && (
-            <div className="absolute right-0 top-[56px] z-30 w-[320px] rounded-[14px] border border-black/5 bg-white p-4 shadow-[0_18px_40px_rgba(17,24,39,0.12)]">
+            <div className="absolute right-0 top-[56px] z-30 w-[280px] rounded-[14px] border border-[#E5E7EB] bg-white p-4 shadow-[0_18px_40px_rgba(17,24,39,0.18)]">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -79,7 +81,7 @@ export function AdminHeader() {
               </button>
 
               <div className="flex items-center gap-3 pr-6">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F3F4F6] text-[#2B2E39]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F3F4F6] text-[#2B2E39]">
                   <AvatarIcon />
                 </div>
                 <div className="min-w-0">

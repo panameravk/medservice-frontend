@@ -1,3 +1,5 @@
+import { LEGAL_LINKS } from "../lib/legal";
+
 export function Footer({ className = "" }: { className?: string }) {
   return (
     <footer className={`pb-6 ${className}`}>
@@ -8,21 +10,21 @@ export function Footer({ className = "" }: { className?: string }) {
           </span>
 
           <a
-            href="https://fdbck.ru/privacy-policy"
+            href={LEGAL_LINKS.userAgreement.href}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#9CA3AF] underline decoration-transparent underline-offset-4 hover:decoration-[#9CA3AF]"
           >
-            Пользовательское соглашение
+            {LEGAL_LINKS.userAgreement.label}
           </a>
 
           <a
-            href="https://fdbck.ru/cookie-policy"
+            href={LEGAL_LINKS.cookiePolicy.href}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#9CA3AF] underline decoration-transparent underline-offset-4 hover:decoration-[#9CA3AF]"
           >
-            Политика использования файлов Cookie
+            {LEGAL_LINKS.cookiePolicy.label}
           </a>
         </div>
       </div>

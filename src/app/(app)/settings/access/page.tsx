@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Switch } from "../../../components/ui/Switch";
 import { useBranchesStore } from "../../../lib/branchesStore";
 
 interface TeamMember {
@@ -238,11 +237,16 @@ export default function AccessPage() {
   const [editing, setEditing] = useState<TeamMember | null>(null);
 
   useEffect(() => {
-    if (!selectedBranchId) {
-      setMembers([]);
-      return;
-    }
-    setMembers(loadMembers(selectedBranchId));
+    let cancelled = false;
+
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setMembers(selectedBranchId ? loadMembers(selectedBranchId) : []);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedBranchId]);
 
   const persist = (next: TeamMember[]) => {

@@ -21,7 +21,6 @@ import { useBranchesStore } from "../../lib/branchesStore";
 
 const inputCls =
   "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none transition focus:border-[#D8D8D8]";
-const selectCls = `${inputCls} cursor-pointer appearance-none`;
 const textareaCls =
   "min-h-[96px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 py-3 text-[14px] text-[#222222] outline-none transition focus:border-[#D8D8D8]";
 const labelCls = "mb-2 block text-[13px] font-medium text-[#222222]";
@@ -351,17 +350,16 @@ function BonusModal({
       <div className="space-y-4">
         <div>
           <label className={labelCls}>Размер скидки (%)</label>
-          <select
-            value={discount}
-            onChange={(e) => setDiscount(Number(e.target.value))}
-            className={`${selectCls} w-[120px]`}
-          >
-            {DISCOUNT_OPTIONS.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
+          <div className="w-[140px]">
+            <CustomSelect
+              value={String(discount)}
+              options={DISCOUNT_OPTIONS.map((d) => ({
+                label: `${d}%`,
+                value: String(d),
+              }))}
+              onChange={(value) => setDiscount(Number(value))}
+            />
+          </div>
         </div>
 
         <div>

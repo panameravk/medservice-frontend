@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { Brand } from "../Brand";
 
 function BranchIcon({ className = "" }: { className?: string }) {
   return (
@@ -113,48 +114,46 @@ export function AdminSideBar() {
   const router = useRouter();
 
   return (
-    <aside className="flex min-h-screen flex-col bg-white px-[18px] py-[30px]">
-      <Link href="/admin/branches" className="mb-[42px] block">
-        <div className="text-[28px] font-black leading-none tracking-[-0.08em] text-[#111827]">
-          Фидбэк
-          <span className="ml-[4px] align-top text-[11px] font-black tracking-normal">
-            ИИ
-          </span>
+    <aside className="min-h-screen w-[260px] border-r border-black/5 bg-white">
+      <div className="flex h-full flex-col px-4 py-6">
+        <div className="px-2">
+          <Link href="/admin/branches" className="block">
+            <Brand size="sm" />
+          </Link>
         </div>
-      </Link>
 
-      <nav className="space-y-[14px]">
-        {navItems.map((item) => {
-          const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const Icon = item.icon;
+        <nav className="mt-6 space-y-1">
+          {navItems.map((item) => {
+            const active =
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const Icon = item.icon;
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={[
-                "flex h-[28px] items-center gap-[10px] rounded-[8px]",
-                "text-[14px] font-semibold transition",
-                active
-                  ? "text-[#111827]"
-                  : "text-[#1F2937] hover:text-[#111827]",
-              ].join(" ")}
-            >
-              <Icon className="h-[18px] w-[18px] shrink-0" />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={[
+                  "flex items-center gap-3 rounded-[10px] px-3 py-2 text-[16px] font-bold text-[#111827] transition",
+                  active ? "bg-[#F3F4F6]" : "hover:bg-black/5",
+                ].join(" ")}
+              >
+                <Icon className="h-[18px] w-[18px] shrink-0" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
 
-      <button
-        type="button"
-        onClick={() => router.push("/admin/branches?create=1")}
-        className="mt-[54px] h-[44px] w-[166px] rounded-[7px] bg-black text-[14px] font-semibold text-white transition hover:bg-[#1F2937]"
-      >
-        Создать филиал
-      </button>
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            onClick={() => router.push("/admin/branches?create=1")}
+            className="flex h-10 w-[170px] cursor-pointer items-center justify-center rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90"
+          >
+            Создать филиал
+          </button>
+        </div>
+      </div>
     </aside>
   );
 }

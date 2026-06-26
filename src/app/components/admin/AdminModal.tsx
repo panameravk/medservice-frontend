@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 function XIcon() {
@@ -28,9 +28,6 @@ export function AdminModal({
   widthClassName?: string;
   title?: string;
 }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -45,7 +42,7 @@ export function AdminModal({
   // the containing block for `position: fixed` descendants — which would clip
   // this backdrop to the content area instead of the full viewport. The portal
   // escapes that ancestor so `fixed inset-0` covers the real viewport.
-  if (!mounted) return null;
+  if (typeof document === "undefined") return null;
 
   return createPortal(
     <div

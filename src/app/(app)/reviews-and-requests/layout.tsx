@@ -59,7 +59,7 @@ export default function ReviewsAndRequestsLayout({
         })}
       </div>
 
-      <div className="min-h-[520px] rounded-[14px] border border-[#E6E6E6] bg-white">
+      <div className="min-h-[520px] rounded-b-[14px] rounded-tr-[14px] border border-[#E6E6E6] bg-white">
         {children}
       </div>
     </div>

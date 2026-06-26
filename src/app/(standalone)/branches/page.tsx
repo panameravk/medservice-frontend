@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { getDateRangeByPeriod, type Period } from "../../lib/date";
 import { Unbounded } from "next/font/google";
 import { useBranchesStore } from "../../lib/branchesStore";
+import { DateRangeControl } from "../../components/DateRangeControl";
 import { UserIcon } from "../../components/ui/icons/UserIcon";
 import {
   authApi,
@@ -19,6 +20,7 @@ import {
   getBranchesAnalytics,
   type BranchAnalyticsRow,
 } from "../../lib/api";
+import { LEGAL_LINKS } from "../../lib/legal";
 
 const unbounded = Unbounded({
   subsets: ["cyrillic"],
@@ -105,113 +107,6 @@ function LockIcon({ className = "" }: { className?: string }) {
   );
 }
 
-function CalendarIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <path
-        d="M7 3v3M17 3v3"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M4 8h16"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <rect
-        x="5"
-        y="5"
-        width="14"
-        height="16"
-        rx="2"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-    </svg>
-  );
-}
-
-function DateField({
-  value,
-  formatRu,
-  onChange,
-}: {
-  value: string;
-  formatRu: (value: string) => string;
-  onChange: (next: string) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const openCalendar = () => {
-    const input = inputRef.current;
-
-    if (!input) return;
-
-    if (typeof input.showPicker === "function") {
-      input.showPicker();
-    } else {
-      input.click();
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={openCalendar}
-      className="relative flex h-10 w-[150px] items-center justify-between gap-2 rounded-[10px] border border-[#E5E7EB] bg-white px-3 text-[13px] text-[#111827] shadow-[0_1px_0_rgba(0,0,0,0.02)]"
-    >
-      <span className="tabular-nums">{formatRu(value)}</span>
-
-      <svg
-        className="text-[#9CA3AF]"
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-      >
-        <path
-          d="M7 3v3M17 3v3"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <path
-          d="M4 8h16"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <rect
-          x="5"
-          y="5"
-          width="14"
-          height="16"
-          rx="2"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
-      </svg>
-
-      <input
-        ref={inputRef}
-        type="date"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
-        tabIndex={-1}
-      />
-    </button>
-  );
-}
-
 export default function BranchesPage() {
   const router = useRouter();
 
@@ -234,13 +129,6 @@ export default function BranchesPage() {
   const initialRange = getDateRangeByPeriod("30");
   const [dateFrom, setDateFrom] = useState(() => toISODate(initialRange.start));
   const [dateTo, setDateTo] = useState(() => toISODate(initialRange.end));
-
-  const formatRu = (iso: string) => {
-    if (!iso) return "—";
-    const [y, m, d] = iso.split("-");
-    if (!y || !m || !d) return iso;
-    return `${d}.${m}.${y}`;
-  };
 
   const [rows, setRows] = useState<BranchAnalyticsRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -521,53 +409,25 @@ export default function BranchesPage() {
               Аналитика по филиалам
             </h1>
 
-            <div className="mt-4 flex items-center gap-6">
-              <div className="flex overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
-                {(["week", "30", "90", "year"] as Period[]).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={`px-5 py-2.5 text-[13px] transition-colors ${
-                      activePreset === value
-                        ? "bg-[#F3F4F6] font-medium text-[#111827]"
-                        : "text-[#9CA3AF] hover:bg-black/[0.02]"
-                    }`}
-                    onClick={() => {
-                      const next = getDateRangeByPeriod(value, new Date());
-                      setActivePreset(value);
-                      setDateFrom(toISODate(next.start));
-                      setDateTo(toISODate(next.end));
-                    }}
-                  >
-                    {value === "week"
-                      ? "Неделя"
-                      : value === "year"
-                      ? "Год"
-                      : `${value} дней`}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <DateField
-                  value={dateFrom}
-                  formatRu={formatRu}
-                  onChange={(next) => {
-                    setActivePreset(null);
-                    setDateFrom(next);
-                  }}
-                />
-                <span className="text-[13px] text-[#9CA3AF]">—</span>
-                <DateField
-                  value={dateTo}
-                  formatRu={formatRu}
-                  onChange={(next) => {
-                    setActivePreset(null);
-                    setDateTo(next);
-                  }}
-                />
-              </div>
-            </div>
+            <DateRangeControl
+              activePreset={activePreset}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              className="mt-4"
+              onPresetChange={(value, range) => {
+                setActivePreset(value);
+                setDateFrom(range.start);
+                setDateTo(range.end);
+              }}
+              onDateFromChange={(next) => {
+                setActivePreset(null);
+                setDateFrom(next);
+              }}
+              onDateToChange={(next) => {
+                setActivePreset(null);
+                setDateTo(next);
+              }}
+            />
           </div>
 
           <div className="px-8 pb-6 pt-6">
@@ -669,20 +529,20 @@ export default function BranchesPage() {
                 Все права защищены © ООО «Фидбэк»
               </span>
               <a
-                href="https://fdbck.ru/privacy-policy"
+                href={LEGAL_LINKS.userAgreement.href}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#9CA3AF] underline decoration-transparent underline-offset-4 hover:decoration-[#9CA3AF]"
               >
-                Пользовательское соглашение
+                {LEGAL_LINKS.userAgreement.label}
               </a>
               <a
-                href="https://fdbck.ru/cookie-policy"
+                href={LEGAL_LINKS.cookiePolicy.href}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#9CA3AF] underline decoration-transparent underline-offset-4 hover:decoration-[#9CA3AF]"
               >
-                Политика использования файлов Cookie
+                {LEGAL_LINKS.cookiePolicy.label}
               </a>
             </div>
           </div>

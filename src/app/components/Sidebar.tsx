@@ -38,14 +38,14 @@ export function Sidebar() {
   const [usage, setUsage] = useState<RequestUsage | null>(null);
 
   useEffect(() => {
-    if (!selectedBranchId) {
-      setUsage(null);
-      return;
-    }
-
     let cancelled = false;
 
     const loadUsage = async () => {
+      if (!selectedBranchId) {
+        if (!cancelled) setUsage(null);
+        return;
+      }
+
       try {
         const data = await getRequestUsage(selectedBranchId);
         if (!cancelled) {
