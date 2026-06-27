@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   ResponsiveContainer,
@@ -212,31 +214,112 @@ type DailyReviewPoint = {
   count: number;
 };
 
-function DailyReviewsSmallSection({
+function NpsSmallSection({
   data,
-  total,
+  satisfaction,
 }: {
-  data: DailyReviewPoint[];
-  total: number;
+  data: DashboardData["npsSmall"];
+  satisfaction: DashboardData["satisfaction"];
 }) {
+  const chartData = useMemo(() => {
+    if (!data.length) return [];
+    return data.map((item) => ({
+      index: item.index,
+      nps: item.nps,
+      label: formatDateShort(new Date(item.bucketStart)),
+      range: `${formatDateShort(new Date(item.bucketStart))} – ${formatDateShort(
+        new Date(item.bucketEnd)
+      )}`,
+    }));
+  }, [data]);
+
+  const aggregateNps = computeAggregateNps(satisfaction);
+  const npsValues = chartData.map((item) => item.nps);
+  const minNps = npsValues.length ? Math.min(...npsValues) : 0;
+  const maxNps = npsValues.length ? Math.max(...npsValues) : 0;
+  const npsPadding = Math.max(8, Math.round((maxNps - minNps) * 0.12));
+  const npsDomain: [number, number] = [
+    minNps - npsPadding,
+    maxNps + npsPadding,
+  ];
+
   return (
-    <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
-      <div className="mb-1 flex items-baseline justify-between">
-        <div className="text-[14px] font-medium text-[#111827]">
-          Отзывы за сутки
+    <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-5 py-4">
+      <div className="mb-2 flex items-start justify-between">
+        <div className="text-[16px] font-semibold leading-[20px] text-[#111827]">
+          Динамика NPS
         </div>
-        <div className="text-[20px] font-bold leading-none text-[#111827] tabular-nums">
-          {total}
-        </div>
+        {aggregateNps !== null && (
+          <div className="text-[30px] font-bold leading-none text-[#111827] tabular-nums">
+            {aggregateNps}
+          </div>
+        )}
       </div>
 
-      {total === 0 ? (
-        <EmptyState text="Нет отзывов за выбранный период" />
+      {aggregateNps === null ? (
+        <EmptyState text="Нет данных по NPS" />
       ) : (
-        <DailyReviewsBarChart data={data} height={90} compact />
+        <div className="h-[128px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={chartData}
+              margin={{ top: 10, right: 8, bottom: 8, left: 8 }}
+            >
+              <defs>
+                <linearGradient id="npsSmallFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#60A5FA" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="#60A5FA" stopOpacity={0.05} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="label" hide />
+              <YAxis hide domain={npsDomain} />
+              <Tooltip
+                cursor={{ stroke: "#CBD5E1", strokeDasharray: "3 3" }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const row = payload[0].payload as {
+                    range: string;
+                    nps: number;
+                  };
+                  return (
+                    <div className="rounded-[8px] border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11px] text-[#111827] shadow-[0_4px_10px_rgba(17,24,39,0.08)]">
+                      <div className="text-[#6B7280]">{row.range}</div>
+                      <div className="font-semibold">
+                        NPS: <span className="tabular-nums">{row.nps}</span>
+                      </div>
+                    </div>
+                  );
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="nps"
+                stroke="#3B82F6"
+                strokeWidth={2.4}
+                fill="url(#npsSmallFill)"
+                baseValue={npsDomain[0]}
+                dot={{ r: 3, fill: "#3B82F6" }}
+                activeDot={{ r: 4, fill: "#1D4ED8" }}
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </section>
   );
+}
+
+function computeAggregateNps(
+  satisfaction: DashboardData["satisfaction"]
+): number | null {
+  const total = satisfaction.reduce((acc, row) => acc + row.count, 0);
+  if (total === 0) return null;
+  const promoters = satisfaction.find((r) => r.stars === 5)?.count ?? 0;
+  const detractors = satisfaction
+    .filter((r) => r.stars <= 3)
+    .reduce((acc, r) => acc + r.count, 0);
+  return Math.round(((promoters - detractors) / total) * 100);
 }
 
 function DailyReviewsBarChart({
@@ -498,7 +581,8 @@ export default function AnalyticsPage() {
     }
 
     if (useCustomRange && dateFrom && dateTo && dateFrom > dateTo) {
-      // Не делаем запрос в "перевёрнутом" диапазоне
+      setError("Дата начала не может быть позже даты окончания");
+      setLoading(false);
       return;
     }
 
@@ -544,14 +628,6 @@ export default function AnalyticsPage() {
 
   if (!selectedBranchId) {
     return <p className="text-sm text-[#9CA3AF]">Сначала выберите филиал</p>;
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-[12px] border border-[#FECACA] bg-[#FEF2F2] p-4 text-sm text-[#B91C1C]">
-        {error}
-      </div>
-    );
   }
 
   const dailyReviewCounts = dashboard
@@ -616,6 +692,12 @@ export default function AnalyticsPage() {
             />
           </div>
         </div>
+
+        {error && (
+          <div className="mt-3 rounded-[12px] border border-[#FECACA] bg-[#FEF2F2] p-4 text-sm text-[#B91C1C]">
+            {error}
+          </div>
+        )}
       </div>
 
       {loading && !dashboard ? (
@@ -630,7 +712,7 @@ export default function AnalyticsPage() {
           <div className="h-[210px] rounded-[12px] bg-white/70" />
         </div>
       ) : !dashboard ? null : (
-        <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
           <div className="space-y-4">
             <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
               <div className="grid grid-cols-4 gap-6">
@@ -722,9 +804,9 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-[1fr_1fr] gap-4">
               <SatisfactionSection data={dashboard.satisfaction} />
 
-              <DailyReviewsSmallSection
-                data={dailyReviewCounts}
-                total={dashboard.reviews}
+              <NpsSmallSection
+                data={dashboard.npsSmall}
+                satisfaction={dashboard.satisfaction}
               />
             </div>
 
