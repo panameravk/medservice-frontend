@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Area,
-  AreaChart,
-  ReferenceLine,
+  Bar,
+  BarChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
+  YAxis,
 } from "recharts";
-import { DateRangeControl } from "../../components/DateRangeControl";
-import { getDashboard, type DashboardData } from "../../lib/api";
+import { getDashboard, type DashboardData, type Period } from "../../lib/api";
 import { useBranchesStore } from "../../lib/branchesStore";
-import { getDateRangeByPeriod, type Period } from "../../lib/date";
+import { getDateRangeByPeriod } from "../../lib/date";
 
 function EmptyState({ text }: { text: string }) {
   return <p className="text-[13px] text-[#9CA3AF]">{text}</p>;
@@ -47,8 +46,8 @@ function PlatformIcon({ platform }: { platform: string }) {
     yandex_maps: "/Icons/platforms/yandex-maps-logo.svg",
     google_maps: "/Icons/platforms/google-maps-sign-logo.svg",
     "2gis": "/Icons/platforms/2gis-icon-logo.svg",
-    prodoctorov: "/Icons/platforms/prodoktorov.svg",
-    napopravku: "/Icons/platforms/napopravku.svg",
+    prodoctorov: "/Icons/platforms/prodoctorov_logo.svg",
+    napopravku: "/Icons/platforms/napopravku_logo.svg",
   };
 
   const src = iconMap[platform];
@@ -193,115 +192,7 @@ function SatisfactionSection({
   );
 }
 
-function NpsSmallSection({
-  data,
-  satisfaction,
-}: {
-  data: DashboardData["npsSmall"];
-  satisfaction: DashboardData["satisfaction"];
-}) {
-  const chartData = useMemo(() => {
-    if (!data.length) return [];
-    return data.map((item) => ({
-      index: item.index,
-      nps: item.nps,
-      label: formatDateShort(new Date(item.bucketStart)),
-      range: `${formatDateShort(new Date(item.bucketStart))} – ${formatDateShort(
-        new Date(item.bucketEnd)
-      )}`,
-    }));
-  }, [data]);
-
-  const aggregateNps = computeAggregateNps(satisfaction);
-
-  return (
-    <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
-      <div className="mb-1 flex items-baseline justify-between">
-        <div className="text-[14px] font-medium text-[#111827]">
-          Динамика NPS
-        </div>
-        {aggregateNps !== null && (
-          <div className="text-[20px] font-bold leading-none text-[#111827] tabular-nums">
-            {aggregateNps}
-          </div>
-        )}
-      </div>
-
-      {aggregateNps === null ? (
-        <EmptyState text="Нет данных по NPS" />
-      ) : (
-        <div className="h-[90px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={chartData}
-              margin={{ top: 5, right: 4, bottom: 0, left: 0 }}
-            >
-              <defs>
-                <linearGradient id="npsSmallFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#60A5FA" stopOpacity={0.55} />
-                  <stop offset="100%" stopColor="#60A5FA" stopOpacity={0.05} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="label" hide />
-              <ReferenceLine
-                y={0}
-                stroke="#E5E7EB"
-                strokeDasharray="2 2"
-              />
-              <Tooltip
-                cursor={{ stroke: "#CBD5E1", strokeDasharray: "3 3" }}
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null;
-                  const row = payload[0].payload as {
-                    range: string;
-                    nps: number;
-                  };
-                  return (
-                    <div className="rounded-[8px] border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11px] text-[#111827] shadow-[0_4px_10px_rgba(17,24,39,0.08)]">
-                      <div className="text-[#6B7280]">{row.range}</div>
-                      <div className="font-semibold">
-                        NPS: <span className="tabular-nums">{row.nps}</span>
-                      </div>
-                    </div>
-                  );
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="nps"
-                stroke="#3B82F6"
-                strokeWidth={1.8}
-                fill="url(#npsSmallFill)"
-                dot={{ r: 2, fill: "#3B82F6" }}
-                activeDot={{ r: 4, fill: "#1D4ED8" }}
-                isAnimationActive={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function computeAggregateNps(
-  satisfaction: DashboardData["satisfaction"]
-): number | null {
-  const total = satisfaction.reduce((acc, row) => acc + row.count, 0);
-  if (total === 0) return null;
-  const promoters = satisfaction.find((r) => r.stars === 5)?.count ?? 0;
-  const detractors = satisfaction
-    .filter((r) => r.stars <= 3)
-    .reduce((acc, r) => acc + r.count, 0);
-  return Math.round(((promoters - detractors) / total) * 100);
-}
-
-function pluralize(
-  n: number,
-  one: string,
-  few: string,
-  many: string
-): string {
+function pluralize(n: number, one: string, few: string, many: string): string {
   const mod10 = n % 10;
   const mod100 = n % 100;
   if (mod10 === 1 && mod100 !== 11) return one;
@@ -315,27 +206,143 @@ function formatDateShort(date: Date): string {
   return `${d}.${m}`;
 }
 
-function LargeBarChart({ values }: { values: number[] }) {
-  const safe = values.length ? values : [0];
-  const min = Math.min(...safe);
-  const max = Math.max(...safe);
-  const range = Math.max(max - min, 1);
+type DailyReviewPoint = {
+  date: string;
+  label: string;
+  count: number;
+};
 
+function DailyReviewsSmallSection({
+  data,
+  total,
+}: {
+  data: DailyReviewPoint[];
+  total: number;
+}) {
   return (
-    <div className="flex h-[180px] items-end gap-[8px] border-b border-l border-[#6B7280] pb-[2px] pl-[8px]">
-      {safe.map((value, index) => {
-        const normalized = ((value - min) / range) * 0.78 + 0.15;
+    <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
+      <div className="mb-1 flex items-baseline justify-between">
+        <div className="text-[14px] font-medium text-[#111827]">
+          Отзывы за сутки
+        </div>
+        <div className="text-[20px] font-bold leading-none text-[#111827] tabular-nums">
+          {total}
+        </div>
+      </div>
 
-        return (
-          <div
-            key={index}
-            className="w-[10px] rounded-t-[2px] bg-[#D8E5F6]"
-            style={{ height: `${Math.max(12, normalized * 180)}px` }}
+      {total === 0 ? (
+        <EmptyState text="Нет отзывов за выбранный период" />
+      ) : (
+        <DailyReviewsBarChart data={data} height={90} compact />
+      )}
+    </section>
+  );
+}
+
+function DailyReviewsBarChart({
+  data,
+  height = 180,
+  compact = false,
+}: {
+  data: DailyReviewPoint[];
+  height?: number;
+  compact?: boolean;
+}) {
+  return (
+    <div style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={data}
+          margin={{ top: 8, right: 4, bottom: compact ? 0 : 6, left: 0 }}
+          barCategoryGap={compact ? "35%" : "28%"}
+        >
+          <XAxis
+            dataKey="label"
+            hide={compact}
+            axisLine={{ stroke: "#6B7280" }}
+            tickLine={false}
+            tick={{ fontSize: 11, fill: "#6B7280" }}
+            interval={Math.max(0, Math.floor(data.length / 8))}
           />
-        );
-      })}
+          <YAxis
+            allowDecimals={false}
+            width={32}
+            axisLine={{ stroke: "#6B7280" }}
+            tickLine={false}
+            tick={{ fontSize: 11, fill: "#6B7280" }}
+          />
+          <Tooltip
+            cursor={{ fill: "rgba(209, 213, 219, 0.24)" }}
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const row = payload[0].payload as DailyReviewPoint;
+              return (
+                <div className="rounded-[8px] border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11px] text-[#111827] shadow-[0_4px_10px_rgba(17,24,39,0.08)]">
+                  <div className="text-[#6B7280]">{row.label}</div>
+                  <div className="font-semibold">
+                    Отзывы: <span className="tabular-nums">{row.count}</span>
+                  </div>
+                </div>
+              );
+            }}
+          />
+          <Bar
+            dataKey="count"
+            fill="#D8E5F6"
+            radius={[3, 3, 0, 0]}
+            isAnimationActive={false}
+          />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
+}
+
+function buildDailyReviewCounts(
+  reviews: DashboardData["recentReviews"],
+  startIso: string,
+  endIso: string
+): DailyReviewPoint[] {
+  const start = parseIsoDate(startIso);
+  const end = parseIsoDate(endIso);
+  if (!start || !end || start > end) return [];
+
+  const counters = new Map<string, number>();
+  for (const review of reviews) {
+    if (!review.publishedAt) continue;
+    const publishedAt = new Date(review.publishedAt);
+    if (Number.isNaN(publishedAt.getTime())) continue;
+
+    const key = formatIsoDateLocal(publishedAt);
+    counters.set(key, (counters.get(key) ?? 0) + 1);
+  }
+
+  const result: DailyReviewPoint[] = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const date = formatIsoDateLocal(cursor);
+    result.push({
+      date,
+      label: formatDateShort(cursor),
+      count: counters.get(date) ?? 0,
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return result;
+}
+
+function parseIsoDate(value: string): Date | null {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+}
+
+function formatIsoDateLocal(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function PercentBadge({
@@ -372,23 +379,86 @@ function ReviewStars({ rating }: { rating: number }) {
 export default function AnalyticsPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
 
-  const [activePreset, setActivePreset] = useState<Period | null>("30");
+  const [period, setPeriod] = useState<Period>("30");
   const [currentDate, setCurrentDate] = useState(() => new Date());
 
   const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+  const [useCustomRange, setUseCustomRange] = useState(false);
   const [dateFrom, setDateFrom] = useState(() =>
-    toISODate(getDateRangeByPeriod("30", currentDate).start)
+    toISODate(getDateRangeByPeriod(period, currentDate).start)
   );
   const [dateTo, setDateTo] = useState(() =>
-    toISODate(getDateRangeByPeriod("30", currentDate).end)
+    toISODate(getDateRangeByPeriod(period, currentDate).end)
   );
 
+  const formatRu = (iso: string) => {
+    if (!iso) return "—";
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return iso;
+    return `${d}.${m}.${y}`;
+  };
+
+  function CalendarIcon({ className = "" }: { className?: string }) {
+    return (
+      <svg
+        className={className}
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <path
+          d="M7 3v3M17 3v3"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M4 8h16"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <rect
+          x="5"
+          y="5"
+          width="14"
+          height="16"
+          rx="2"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+      </svg>
+    );
+  }
+
+  function DateField({
+    value,
+    onChange,
+  }: {
+    value: string;
+    onChange: (next: string) => void;
+  }) {
+    return (
+      <div className="relative flex h-10 w-[150px] items-center justify-between gap-2 rounded-[10px] border border-[#E5E7EB] bg-white px-3 text-[13px] text-[#111827] shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+        <span className="tabular-nums">{formatRu(value)}</span>
+        <CalendarIcon className="text-[#9CA3AF]" />
+        <input
+          type="date"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        />
+      </div>
+    );
+  }
+
   useEffect(() => {
-    if (activePreset === null) return;
-    const next = getDateRangeByPeriod(activePreset, currentDate);
+    if (useCustomRange) return;
+    const next = getDateRangeByPeriod(period, currentDate);
     setDateFrom(toISODate(next.start));
     setDateTo(toISODate(next.end));
-  }, [activePreset, currentDate]);
+  }, [currentDate, period, useCustomRange]);
 
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -427,9 +497,8 @@ export default function AnalyticsPage() {
       return;
     }
 
-    if (dateFrom && dateTo && dateFrom > dateTo) {
-      setError("Дата начала не может быть позже даты окончания");
-      setLoading(false);
+    if (useCustomRange && dateFrom && dateTo && dateFrom > dateTo) {
+      // Не делаем запрос в "перевёрнутом" диапазоне
       return;
     }
 
@@ -442,9 +511,7 @@ export default function AnalyticsPage() {
 
         const data = await getDashboard(
           selectedBranchId,
-          activePreset !== null
-            ? { period: activePreset }
-            : { start: dateFrom, end: dateTo }
+          useCustomRange ? { start: dateFrom, end: dateTo } : { period }
         );
 
         if (!cancelled) {
@@ -473,11 +540,23 @@ export default function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [activePreset, dateFrom, dateTo, selectedBranchId]);
+  }, [dateFrom, dateTo, period, selectedBranchId, useCustomRange]);
 
   if (!selectedBranchId) {
     return <p className="text-sm text-[#9CA3AF]">Сначала выберите филиал</p>;
   }
+
+  if (error) {
+    return (
+      <div className="rounded-[12px] border border-[#FECACA] bg-[#FEF2F2] p-4 text-sm text-[#B91C1C]">
+        {error}
+      </div>
+    );
+  }
+
+  const dailyReviewCounts = dashboard
+    ? buildDailyReviewCounts(dashboard.recentReviews, dateFrom, dateTo)
+    : [];
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -489,31 +568,54 @@ export default function AnalyticsPage() {
           Динамика рейтинга и репутации
         </p>
 
-        <DateRangeControl
-          activePreset={activePreset}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          className="mt-4"
-          onPresetChange={(value, range) => {
-            setActivePreset(value);
-            setDateFrom(range.start);
-            setDateTo(range.end);
-          }}
-          onDateFromChange={(next) => {
-            setActivePreset(null);
-            setDateFrom(next);
-          }}
-          onDateToChange={(next) => {
-            setActivePreset(null);
-            setDateTo(next);
-          }}
-        />
+        <div className="mt-4 flex items-center gap-[14px]">
+          <div className="flex h-10 overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
+            {(["week", "30", "90", "year"] as Period[]).map((value) => {
+              const active = period === value;
 
-        {error && (
-          <div className="mt-3 rounded-[12px] border border-[#FECACA] bg-[#FEF2F2] p-4 text-sm text-[#B91C1C]">
-            {error}
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    setPeriod(value);
+                    setUseCustomRange(false);
+                  }}
+                  className={[
+                    "px-4 text-[13px]",
+                    active
+                      ? "bg-[#F3F4F6] font-medium text-[#111827]"
+                      : "text-[#9CA3AF] hover:bg-black/[0.02]",
+                  ].join(" ")}
+                >
+                  {value === "week"
+                    ? "Неделя"
+                    : value === "year"
+                    ? "Год"
+                    : `${value} дней`}
+                </button>
+              );
+            })}
           </div>
-        )}
+
+          <div className="flex items-center gap-2">
+            <DateField
+              value={dateFrom}
+              onChange={(next) => {
+                setUseCustomRange(true);
+                setDateFrom(next);
+              }}
+            />
+            <span className="text-[13px] text-[#9CA3AF]">—</span>
+            <DateField
+              value={dateTo}
+              onChange={(next) => {
+                setUseCustomRange(true);
+                setDateTo(next);
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {loading && !dashboard ? (
@@ -528,14 +630,14 @@ export default function AnalyticsPage() {
           <div className="h-[210px] rounded-[12px] bg-white/70" />
         </div>
       ) : !dashboard ? null : (
-        <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
+        <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
           <div className="space-y-4">
             <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
               <div className="grid grid-cols-4 gap-6">
                 <MetricStat
                   value={dashboard.sent}
                   labelTop="отправлено"
-                  labelBottom="запросов"
+                  labelBottom=""
                 />
                 <MetricStat
                   value={dashboard.reviews}
@@ -565,10 +667,10 @@ export default function AnalyticsPage() {
                   <thead>
                     <tr className="text-[15px] font-medium text-[#111827]">
                       <th className="w-[169px] pb-2.5">Площадка</th>
-                      <th className="w-[88px] pb-2.5 text-center">Рейтинг</th>
-                      <th className="w-[88px] pb-2.5 text-center">Отзывы</th>
-                      <th className="w-[119px] pb-2.5 text-center">Всего отзывов</th>
-                      <th className="w-[106px] pb-2.5 text-center">Всего негатива</th>
+                      <th className="w-[88px] pb-2.5">Рейтинг</th>
+                      <th className="w-[88px] pb-2.5">Отзывы</th>
+                      <th className="w-[119px] pb-2.5">Всего отзывов</th>
+                      <th className="w-[106px] pb-2.5">Всего негатива</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -597,18 +699,14 @@ export default function AnalyticsPage() {
                             <span className="truncate">{item.label}</span>
                           </div>
                         </td>
-                        <td className="py-[6px] text-center">
+                        <td className="py-[6px]">
                           <RatingBadge value={item.rating} />
                         </td>
-                        <td className="py-[6px] text-center">{item.reviews}</td>
-                        <td className="py-[6px] text-center">
-                          {item.totalReviews}
-                        </td>
+                        <td className="py-[6px]">{item.reviews}</td>
+                        <td className="py-[6px]">{item.totalReviews}</td>
                         <td className="py-[6px]">
-                          <div className="flex items-center justify-center gap-2.5">
-                            <span className="w-[26px] text-right tabular-nums">
-                              {item.totalNegative}
-                            </span>
+                          <div className="flex items-center gap-2.5">
+                            <span>{item.totalNegative}</span>
                             <NegativeBadge
                               value={Math.round(item.negativePercent)}
                             />
@@ -624,9 +722,9 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-[1fr_1fr] gap-4">
               <SatisfactionSection data={dashboard.satisfaction} />
 
-              <NpsSmallSection
-                data={dashboard.npsSmall}
-                satisfaction={dashboard.satisfaction}
+              <DailyReviewsSmallSection
+                data={dailyReviewCounts}
+                total={dashboard.reviews}
               />
             </div>
 
@@ -701,25 +799,23 @@ export default function AnalyticsPage() {
 
             <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
               <div className="mb-3 text-[14px] font-medium text-[#111827]">
-                Динамика NPS
+                Отзывы за сутки
               </div>
 
-              {dashboard.npsLarge.length === 0 ? (
-                <EmptyState text="Нет данных по NPS" />
+              {dashboard.reviews === 0 ? (
+                <EmptyState text="Нет отзывов за выбранный период" />
               ) : (
-                <LargeBarChart
-                  values={dashboard.npsLarge.map((item) => item.nps)}
-                />
+                <DailyReviewsBarChart data={dailyReviewCounts} />
               )}
             </section>
           </div>
 
           <aside className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
             <div className="mb-3 text-[14px] font-medium text-[#111827]">
-              Последние отзывы
+              Новые отзывы
             </div>
 
-            <div className="space-y-4">
+            <div className="max-h-[calc(100vh-215px)] space-y-4 overflow-y-auto pr-1">
               {dashboard.recentReviews.length === 0 ? (
                 <EmptyState text="Нет отзывов за выбранный период" />
               ) : (
