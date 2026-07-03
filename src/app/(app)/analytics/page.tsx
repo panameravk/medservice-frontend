@@ -11,7 +11,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getDashboard, type DashboardData, type Period } from "../../lib/api";
+import {
+  getDashboard,
+  updateBranch,
+  type DashboardData,
+  type Period,
+} from "../../lib/api";
 import { useBranchesStore } from "../../lib/branchesStore";
 import { getDateRangeByPeriod } from "../../lib/date";
 
@@ -62,20 +67,24 @@ function PlatformIcon({ platform }: { platform: string }) {
 
 function PlatformToggle({
   enabled,
+  disabled = false,
   onToggle,
 }: {
   enabled: boolean;
+  disabled?: boolean;
   onToggle: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onToggle}
+      disabled={disabled}
       aria-pressed={enabled}
       className={[
         "relative inline-flex h-[20px] w-[35px] shrink-0 items-center rounded-full",
         "transition-all duration-200 ease-out",
         enabled ? "bg-[#34C759]" : "bg-[#D9D9D9]",
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
       ].join(" ")}
     >
       <span
@@ -461,6 +470,7 @@ function ReviewStars({ rating }: { rating: number }) {
 
 export default function AnalyticsPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
+  const updateBranchInStore = useBranchesStore((s) => s.updateBranchInStore);
 
   const [period, setPeriod] = useState<Period>("30");
   const [currentDate, setCurrentDate] = useState(() => new Date());
@@ -550,6 +560,9 @@ export default function AnalyticsPage() {
   const [platformEnabledMap, setPlatformEnabledMap] = useState<
     Record<string, boolean>
   >({});
+  const [platformSavingMap, setPlatformSavingMap] = useState<
+    Record<string, boolean>
+  >({});
 
   useEffect(() => {
     const now = new Date();
@@ -577,6 +590,7 @@ export default function AnalyticsPage() {
       setError(null);
       setLoading(false);
       setPlatformEnabledMap({});
+      setPlatformSavingMap({});
       return;
     }
 
@@ -605,12 +619,14 @@ export default function AnalyticsPage() {
               data.platforms.map((item) => [item.platform, item.enabled])
             )
           );
+          setPlatformSavingMap({});
         }
       } catch {
         if (!cancelled) {
           setDashboard(null);
           setError("Не удалось загрузить аналитику");
           setPlatformEnabledMap({});
+          setPlatformSavingMap({});
         }
       } finally {
         if (!cancelled) {
@@ -633,6 +649,51 @@ export default function AnalyticsPage() {
   const dailyReviewCounts = dashboard
     ? buildDailyReviewCounts(dashboard.recentReviews, dateFrom, dateTo)
     : [];
+
+  async function handlePlatformToggle(platform: string, currentEnabled: boolean) {
+    if (!selectedBranchId || platformSavingMap[platform]) return;
+
+    const nextEnabled = !currentEnabled;
+    setError(null);
+    setPlatformSavingMap((prev) => ({ ...prev, [platform]: true }));
+    setPlatformEnabledMap((prev) => ({ ...prev, [platform]: nextEnabled }));
+    setDashboard((prev) =>
+      prev
+        ? {
+            ...prev,
+            platforms: prev.platforms.map((item) =>
+              item.platform === platform
+                ? { ...item, enabled: nextEnabled }
+                : item
+            ),
+          }
+        : prev
+    );
+
+    try {
+      const updated = await updateBranch(selectedBranchId, {
+        platformEnabled: { [platform]: nextEnabled },
+      });
+      updateBranchInStore(updated);
+    } catch {
+      setPlatformEnabledMap((prev) => ({ ...prev, [platform]: currentEnabled }));
+      setDashboard((prev) =>
+        prev
+          ? {
+              ...prev,
+              platforms: prev.platforms.map((item) =>
+                item.platform === platform
+                  ? { ...item, enabled: currentEnabled }
+                  : item
+              ),
+            }
+          : prev
+      );
+      setError("Не удалось сохранить настройку площадки");
+    } finally {
+      setPlatformSavingMap((prev) => ({ ...prev, [platform]: false }));
+    }
+  }
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -768,14 +829,16 @@ export default function AnalyticsPage() {
                                 platformEnabledMap[item.platform] ??
                                 item.enabled
                               }
-                              onToggle={() =>
-                                setPlatformEnabledMap((prev) => ({
-                                  ...prev,
-                                  [item.platform]: !(
-                                    prev[item.platform] ?? item.enabled
-                                  ),
-                                }))
-                              }
+                              disabled={platformSavingMap[item.platform]}
+                              onToggle={() => {
+                                const currentEnabled =
+                                  platformEnabledMap[item.platform] ??
+                                  item.enabled;
+                                void handlePlatformToggle(
+                                  item.platform,
+                                  currentEnabled
+                                );
+                              }}
                             />
                             <PlatformIcon platform={item.platform} />
                             <span className="truncate">{item.label}</span>

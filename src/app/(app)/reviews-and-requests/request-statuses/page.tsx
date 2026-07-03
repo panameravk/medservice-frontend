@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   getRequests,
@@ -175,14 +176,17 @@ function PlatformBadge({ request }: { request: ReviewRequest }) {
   const reviewUrl = request.reviewUrl ?? "";
 
   if (request.platform === "complaint") {
-    const content = (
-      <span className="inline-flex h-[24px] items-center gap-[7px] rounded-[4px] border border-[#E7E7E7] bg-white px-[10px] text-[11px] text-[#9B9B9B]">
+    return (
+      <Link
+        href="/reviews-and-requests/intercepted-complaints"
+        title="Открыть перехваченные жалобы"
+        className="inline-flex h-[24px] items-center gap-[7px] rounded-[4px] bg-white px-[10px] text-[11px] font-medium text-[#111111] transition-colors hover:bg-[#F2F2F2]"
+      >
         <span className="text-[#FF1E1E]">⚡</span>
         <span>Жалоба</span>
-      </span>
+        <span aria-hidden>↗</span>
+      </Link>
     );
-
-    return content;
   }
 
   if (!request.platform) {

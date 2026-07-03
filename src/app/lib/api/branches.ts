@@ -12,6 +12,8 @@ export interface Branch {
   requestFrequencyDays: number;
   complaintEmails: string[];
   reminderEmails: string[];
+  platformUrls: Record<string, string>;
+  platformEnabled: Record<string, boolean>;
   smsEnabled: boolean;
   smsTemplate: string | null;
   smsMonthlyLimit: number | null;
@@ -31,6 +33,8 @@ type BranchDto = {
   requestFrequencyDays: number;
   complaintEmails: string[];
   reminderEmails: string[];
+  platformUrls: Record<string, string>;
+  platformEnabled: Record<string, boolean>;
   smsEnabled: boolean;
   smsTemplate: string | null;
   smsMonthlyLimit: number | null;
@@ -48,6 +52,8 @@ type BranchUpdatePayload = Partial<{
   requestFrequencyDays: number;
   complaintEmails: string[];
   reminderEmails: string[];
+  platformUrls: Record<string, string>;
+  platformEnabled: Record<string, boolean>;
   smsEnabled: boolean;
   smsTemplate: string | null;
   smsMonthlyLimit: number | null;
@@ -78,6 +84,8 @@ function toBranchUpdateDto(data: BranchUpdatePayload) {
   if ("reminderEmails" in data) {
     dto.reminder_emails = data.reminderEmails;
   }
+  if ("platformUrls" in data) dto.platform_urls = data.platformUrls;
+  if ("platformEnabled" in data) dto.platform_enabled = data.platformEnabled;
   if ("smsEnabled" in data) dto.sms_enabled = data.smsEnabled;
   if ("smsTemplate" in data) dto.sms_template = data.smsTemplate;
   if ("smsMonthlyLimit" in data) dto.sms_monthly_limit = data.smsMonthlyLimit;

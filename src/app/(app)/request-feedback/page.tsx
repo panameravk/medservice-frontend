@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PhoneInput } from "../../components/PhoneInput";
 import {
@@ -51,7 +51,7 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
   const [firstName, setFirstName] = useState("");
   const [phone, setPhone] = useState("");
   const [phoneCanonical, setPhoneCanonical] = useState<string | null>(null);
-  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
   const [requestLoading, setRequestLoading] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [requestSuccess, setRequestSuccess] = useState(false);
@@ -106,11 +106,25 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
     };
   }, [branchId]);
 
-  const toggleEmployee = (id: number) => {
-    setSelectedEmployees((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+  const selectedEmployee = useMemo(
+    () =>
+      selectedEmployeeId === null
+        ? null
+        : employees.find((employee) => employee.id === selectedEmployeeId) ?? null,
+    [employees, selectedEmployeeId]
+  );
+
+  const toggleEmployee = (employee: Employee) => {
+    if (!employee.active) return;
+    setSelectedEmployeeId((current) =>
+      current === employee.id ? null : employee.id
     );
   };
+
+  const getProdoctorovProfileUrl = (employee: Employee): string | null =>
+    employee.profiles.find((url) =>
+      url.trim().toLowerCase().includes("prodoctorov.ru")
+    ) ?? null;
 
   const handleSubmitRequest = async () => {
     setRequestLoading(true);
@@ -119,17 +133,39 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
     setRequestWarning(null);
 
     try {
+      const selectedProdoctorovUrl = selectedEmployee
+        ? getProdoctorovProfileUrl(selectedEmployee)
+        : null;
+
+      if (selectedEmployeeId !== null && !selectedEmployee) {
+        setRequestError("Выбранный сотрудник не найден");
+        return;
+      }
+
+      if (selectedEmployee && !selectedEmployee.active) {
+        setRequestError("У выбранного сотрудника отключены запросы");
+        return;
+      }
+
+      if (selectedEmployee && !selectedProdoctorovUrl) {
+        setRequestError(
+          "У выбранного сотрудника нужно заполнить ссылку на ПроДокторов"
+        );
+        return;
+      }
+
       const created = await createRequest({
         branchId: Number(branchId),
         clientName: `${lastName} ${firstName}`.trim(),
         clientPhone: phoneCanonical ?? "",
+        ...(selectedEmployee ? { employeeId: selectedEmployee.id } : {}),
       });
 
       setLastName("");
       setFirstName("");
       setPhone("");
       setPhoneCanonical(null);
-      setSelectedEmployees([]);
+      setSelectedEmployeeId(null);
 
       // 201 означает «запрос создан», но SMS могла не уйти (отключена,
       // лимит, ошибка провайдера) — это приходит в поле sms.
@@ -266,23 +302,26 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
                       <button
                         key={employee.id}
                         type="button"
-                        onClick={() => toggleEmployee(employee.id)}
+                        disabled={!employee.active}
+                        onClick={() => toggleEmployee(employee)}
                         className={[
                           "rounded-[10px] border px-4 py-3 text-left text-[13px] transition-all",
-                          selectedEmployees.includes(employee.id)
+                          selectedEmployeeId === employee.id
                             ? "border-[#F4C21A] bg-[#FFFBEA] font-semibold text-[#111827]"
-                            : "border-transparent bg-[#F3F4F6] text-[#6B7280] hover:bg-[#EBEBEB]",
+                            : employee.active
+                            ? "border-transparent bg-[#F3F4F6] text-[#6B7280] hover:bg-[#EBEBEB]"
+                            : "cursor-not-allowed border-transparent bg-[#F3F4F6] text-[#B8BDC7] opacity-70",
                         ].join(" ")}
                       >
-                        {employee.name}
+                        <span>{employee.name}</span>
+                        {!employee.active && (
+                          <span className="mt-1 block text-[11px] text-[#9CA3AF]">
+                            Запросы отключены
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
-
-                  <p className="mt-2 text-[11px] text-[#9CA3AF]">
-                    Выбор сотрудника сейчас используется только в интерфейсе.
-                    Бекенд пока не принимает его в запросе на отзыв.
-                  </p>
                 </>
               )}
             </div>

@@ -62,6 +62,7 @@ export interface SmsResult {
 
 export async function createRequest(data: {
   branchId: number;
+  employeeId?: number;
   clientName: string;
   clientPhone: string;
   clientEmail?: string;
