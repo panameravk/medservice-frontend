@@ -113,6 +113,10 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
         : employees.find((employee) => employee.id === selectedEmployeeId) ?? null,
     [employees, selectedEmployeeId]
   );
+  const requestableEmployees = useMemo(
+    () => employees.filter((employee) => employee.active),
+    [employees]
+  );
 
   const toggleEmployee = (employee: Employee) => {
     if (!employee.active) return;
@@ -291,34 +295,26 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
                 <p className="text-[13px] text-[#9CA3AF]">Загрузка...</p>
               ) : employeesError ? (
                 <p className="text-[13px] text-red-500">{employeesError}</p>
-              ) : employees.length === 0 ? (
+              ) : requestableEmployees.length === 0 ? (
                 <p className="text-[13px] text-[#9CA3AF]">
                   Нет сотрудников для выбора
                 </p>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    {employees.map((employee) => (
+                    {requestableEmployees.map((employee) => (
                       <button
                         key={employee.id}
                         type="button"
-                        disabled={!employee.active}
                         onClick={() => toggleEmployee(employee)}
                         className={[
                           "rounded-[10px] border px-4 py-3 text-left text-[13px] transition-all",
                           selectedEmployeeId === employee.id
                             ? "border-[#F4C21A] bg-[#FFFBEA] font-semibold text-[#111827]"
-                            : employee.active
-                            ? "border-transparent bg-[#F3F4F6] text-[#6B7280] hover:bg-[#EBEBEB]"
-                            : "cursor-not-allowed border-transparent bg-[#F3F4F6] text-[#B8BDC7] opacity-70",
+                            : "border-transparent bg-[#F3F4F6] text-[#6B7280] hover:bg-[#EBEBEB]",
                         ].join(" ")}
                       >
                         <span>{employee.name}</span>
-                        {!employee.active && (
-                          <span className="mt-1 block text-[11px] text-[#9CA3AF]">
-                            Запросы отключены
-                          </span>
-                        )}
                       </button>
                     ))}
                   </div>

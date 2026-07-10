@@ -488,6 +488,7 @@ function EditBranchModal({
     phone: string | null;
     specialization: string;
     smsMonthlyLimit: number | null;
+    paidUntil: string | null;
     platformUrls: Record<string, string>;
   }) => void;
 }) {
@@ -497,6 +498,9 @@ function EditBranchModal({
   const [specialization, setSpecialization] = useState(branch.specialization);
   const [tariff, setTariff] = useState(
     branch.smsMonthlyLimit != null ? String(branch.smsMonthlyLimit) : ""
+  );
+  const [paidUntil, setPaidUntil] = useState(
+    branch.paidUntil ? branch.paidUntil.split("T")[0] : ""
   );
   const [urls, setUrls] = useState<Record<string, string>>({ ...branch.platformUrls });
 
@@ -524,6 +528,7 @@ function EditBranchModal({
         tariffNum != null && Number.isFinite(tariffNum) && tariffNum >= 0
           ? tariffNum
           : null,
+      paidUntil: paidUntil || null,
       platformUrls: cleanedUrls,
     });
   };
@@ -564,21 +569,31 @@ function EditBranchModal({
           </select>
         </div>
 
-        <div>
-          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
-            Тариф — запросов в месяц
-          </label>
-          <input
-            type="number"
-            min={0}
-            value={tariff}
-            onChange={(e) => setTariff(e.target.value)}
-            placeholder="например, 150"
-            className={inputCls}
-          />
-          <p className="mt-1.5 text-[12px] text-[#A3A3A3]">
-            Лимит SMS-запросов в месяц. Эта цифра показывается в кабинете как «X из Y».
-          </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+              Тариф — запросов в месяц
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={tariff}
+              onChange={(e) => setTariff(e.target.value)}
+              placeholder="например, 150"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+              Оплачено до
+            </label>
+            <input
+              type="date"
+              value={paidUntil}
+              onChange={(e) => setPaidUntil(e.target.value)}
+              className={inputCls}
+            />
+          </div>
         </div>
 
         <div className="border-t border-[#ECECEC] pt-4">

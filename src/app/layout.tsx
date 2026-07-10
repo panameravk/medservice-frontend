@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import "./globals.css";
 import { Roboto_Flex } from "next/font/google";
+
+export const metadata: Metadata = {
+  title: "MedService",
+  description: "Управление отзывами",
+};
 
 const robotoFlex = Roboto_Flex({
   subsets: ["cyrillic"],

@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Pencil, Plus, Trash2, GripVertical } from "lucide-react";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { AdminModal } from "../../components/admin/AdminModal";
 import { AdminShellCard } from "../../components/admin/AdminShellCard";
 import { AdminSwitch } from "../../components/admin/AdminSwitch";
@@ -25,8 +27,7 @@ const saveBtnCls = `mt-2 h-[48px] w-full ${yellowBtn}`;
 
 const DISCOUNT_OPTIONS = Array.from({ length: 20 }, (_, i) => (i + 1) * 5);
 
-// Partner table column template (mockup: Опубл | Компания | Город | Скидка | Описание | Дата начала | Дата окончания | actions)
-const COLS = "grid-cols-[60px_1.5fr_1fr_64px_2fr_0.9fr_0.9fr_72px]";
+// Partner table column widths are handled via flex (see header and row)
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -49,7 +50,6 @@ export default function AdminBonusesPage() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async load on mount
     void reload();
   }, [reload]);
 
@@ -78,25 +78,104 @@ export default function AdminBonusesPage() {
         </div>
       )}
 
-      <PartnersTab categories={categories} run={run} />
+      <PartnersTab categories={categories} setCategories={setCategories} run={run} reload={reload} />
     </div>
   );
 }
 
-// ─── Partners & categories (mockup layout) ───────────────────────────────────
+// ─── Partners & categories ───────────────────────────────────────────────────
 
 function PartnersTab({
   categories,
+  setCategories,
   run,
+  reload,
 }: {
   categories: AdminBonusCategory[];
+  setCategories: React.Dispatch<React.SetStateAction<AdminBonusCategory[]>>;
   run: (action: () => Promise<unknown>) => Promise<void>;
+  reload: () => Promise<void>;
 }) {
   const [creatingCat, setCreatingCat] = useState(false);
   const [deletingCat, setDeletingCat] = useState<AdminBonusCategory | null>(null);
   const [creatingBonusCat, setCreatingBonusCat] = useState<AdminBonusCategory | null>(null);
   const [editingBonus, setEditingBonus] = useState<AdminPartnerBonus | null>(null);
   const [deletingBonus, setDeletingBonus] = useState<AdminPartnerBonus | null>(null);
+  const containerRef = useRef<HTMLElement | null>(null);
+
+  const onDragEnd = async (result: DropResult) => {
+    const { source, destination, type } = result;
+    if (!destination) return;
+
+    if (type === "category") {
+      if (source.index === destination.index) return;
+
+      const newCategories = Array.from(categories);
+      const [moved] = newCategories.splice(source.index, 1);
+      newCategories.splice(destination.index, 0, moved);
+
+      newCategories.forEach((cat, idx) => {
+        cat.sortOrder = idx;
+      });
+
+      setCategories(newCategories);
+
+      try {
+        await Promise.all(
+          newCategories.map((c) => adminCategoriesApi.update(c.id, { sortOrder: c.sortOrder }))
+        );
+      } catch (e) {
+        void reload();
+      }
+      return;
+    }
+
+    if (type === "bonus") {
+      if (source.droppableId === destination.droppableId && source.index === destination.index) {
+        return;
+      }
+
+      const sourceCatIndex = categories.findIndex((c) => c.id.toString() === source.droppableId);
+      const destCatIndex = categories.findIndex((c) => c.id.toString() === destination.droppableId);
+
+      if (sourceCatIndex === -1 || destCatIndex === -1) return;
+
+      const newCategories = [...categories];
+      const sourceCat = { ...newCategories[sourceCatIndex], bonuses: [...newCategories[sourceCatIndex].bonuses] };
+      const destCat = sourceCatIndex === destCatIndex ? sourceCat : { ...newCategories[destCatIndex], bonuses: [...newCategories[destCatIndex].bonuses] };
+
+      const [movedBonus] = sourceCat.bonuses.splice(source.index, 1);
+      destCat.bonuses.splice(destination.index, 0, movedBonus);
+
+      newCategories[sourceCatIndex] = sourceCat;
+      newCategories[destCatIndex] = destCat;
+
+      destCat.bonuses.forEach((b, idx) => {
+        b.sortOrder = idx;
+      });
+      if (sourceCatIndex !== destCatIndex) {
+        sourceCat.bonuses.forEach((b, idx) => {
+          b.sortOrder = idx;
+        });
+      }
+
+      setCategories(newCategories);
+
+      try {
+        const promises = destCat.bonuses.map((b) =>
+          adminPartnerBonusesApi.update(b.id, { sortOrder: b.sortOrder, categoryId: destCat.id })
+        );
+        if (sourceCatIndex !== destCatIndex) {
+          promises.push(
+            ...sourceCat.bonuses.map((b) => adminPartnerBonusesApi.update(b.id, { sortOrder: b.sortOrder }))
+          );
+        }
+        await Promise.all(promises);
+      } catch (e) {
+        void reload();
+      }
+    }
+  };
 
   return (
     <div>
@@ -111,85 +190,98 @@ function PartnersTab({
       </div>
 
       <AdminShellCard>
-        {/* column header */}
         <div
-          className={`grid ${COLS} items-center gap-3 border-b border-[#E6E6E6] pb-3 text-[13px] font-medium text-[#222222]`}
+          className="flex items-center gap-3 border-b border-[#E6E6E6] pb-3 text-[13px] font-medium text-[#222222]"
         >
-          <div>Опубл.</div>
-          <div>Компания</div>
-          <div>Город</div>
-          <div>Скидка</div>
-          <div>Описание</div>
-          <div>Дата начала</div>
-          <div>Дата окончания</div>
-          <div />
+          <div className="w-[32px]" />
+          <div className="w-[60px]">Опубл.</div>
+          <div className="w-[22%]">Компания</div>
+          <div className="w-[15%]">Город</div>
+          <div className="w-[64px]">Скидка</div>
+          <div className="flex-1">Описание</div>
+          <div className="w-[12%]">Дата начала</div>
+          <div className="w-[12%]">Дата окончания</div>
+          <div className="w-[72px]" />
         </div>
 
         {categories.length === 0 && (
           <p className="py-10 text-center text-[14px] text-[#A3A3A3]">Категорий пока нет</p>
         )}
 
-        {categories.map((cat) => (
-          <div key={cat.id}>
-            <div className="flex items-center gap-2 pb-2 pt-4">
-              <span className="text-[17px] font-bold text-[#111827]">{cat.name}</span>
-              {!cat.isPublished && (
-                <span className="rounded-[6px] bg-[#F3F4F6] px-2 py-0.5 text-[11px] text-[#6B7280]">
-                  скрыта
-                </span>
-              )}
-              <IconBtn label="Удалить категорию" danger onClick={() => setDeletingCat(cat)}>
-                <Trash2 size={16} strokeWidth={1.8} />
-              </IconBtn>
-            </div>
+        <DragDropContext onDragEnd={onDragEnd}>
+          <Droppable droppableId="categories-board" type="category">
+            {(provided) => (
+              <div ref={(el) => { provided.innerRef(el); containerRef.current = el; }} {...provided.droppableProps}>
+                {categories.map((cat, catIndex) => (
+                  <Draggable key={`cat-${cat.id}`} draggableId={`cat-${cat.id}`} index={catIndex}>
+                    {(catProvided, catSnapshot) => {
+                      const catEl = (
+                        <div
+                          ref={catProvided.innerRef}
+                          {...catProvided.draggableProps}
+                          style={catProvided.draggableProps.style}
+                          className={`bg-white ${catSnapshot.isDragging ? "shadow-lg rounded-xl px-5 py-2" : ""}`}
+                        >
+                          <div className="flex items-center gap-2 pb-2 pt-4">
+                            <div
+                              {...catProvided.dragHandleProps}
+                              className="cursor-grab text-[#A3A3A3] hover:text-black"
+                            >
+                              <GripVertical size={18} />
+                            </div>
+                            <span className="text-[17px] font-bold text-[#111827]">{cat.name}</span>
+                            {!cat.isPublished && (
+                              <span className="rounded-[6px] bg-[#F3F4F6] px-2 py-0.5 text-[11px] text-[#6B7280]">
+                                скрыта
+                              </span>
+                            )}
+                            <IconBtn label="Удалить категорию" danger onClick={() => setDeletingCat(cat)}>
+                              <Trash2 size={16} strokeWidth={1.8} />
+                            </IconBtn>
+                          </div>
 
-            {cat.bonuses.map((b) => (
-              <div
-                key={b.id}
-                className={`grid ${COLS} items-center gap-3 border-t border-[#F1F1F1] py-3 text-[14px] text-[#3A3A46]`}
-              >
-                <AdminSwitch
-                  checked={b.isPublished}
-                  onChange={() =>
-                    run(() =>
-                      adminPartnerBonusesApi.update(b.id, { isPublished: !b.isPublished })
-                    )
-                  }
-                />
-                <div className="flex items-center gap-2 truncate pr-2">
-                  {b.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={b.logoUrl}
-                      alt=""
-                      className="h-7 w-7 shrink-0 rounded-[6px] bg-[#F3F4F6] object-contain"
-                    />
-                  ) : null}
-                  <span className="truncate font-medium text-[#111827]">{b.companyName}</span>
-                </div>
-                <div className="truncate pr-2 text-[#6E6E73]">{b.city || "—"}</div>
-                <div className="font-semibold">{b.discountPercent}%</div>
-                <div className="truncate pr-2">{b.description}</div>
-                <div>{fmtDate(b.startDate)}</div>
-                <div>{fmtDate(b.endDate)}</div>
-                <RowActions
-                  onEdit={() => setEditingBonus(b)}
-                  onDelete={() => setDeletingBonus(b)}
-                />
+                          <Droppable droppableId={cat.id.toString()} type="bonus">
+                            {(bonusProvided) => (
+                              <div ref={bonusProvided.innerRef} {...bonusProvided.droppableProps} className="min-h-[10px]">
+                                {cat.bonuses.map((b, bIndex) => (
+                                  <BonusRow
+                                    key={b.id}
+                                    bonus={b}
+                                    index={bIndex}
+                                    containerRef={containerRef}
+                                    run={run}
+                                    onEdit={() => setEditingBonus(b)}
+                                    onDelete={() => setDeletingBonus(b)}
+                                  />
+                                ))}
+                                {bonusProvided.placeholder}
+                              </div>
+                            )}
+                          </Droppable>
+
+                          <div className="border-t border-[#F1F1F1] py-3">
+                            <button
+                              type="button"
+                              onClick={() => setCreatingBonusCat(cat)}
+                              className={`flex h-[38px] items-center gap-2 px-4 ${yellowBtn}`}
+                            >
+                              <Plus size={15} /> Добавить бонус
+                            </button>
+                          </div>
+                        </div>
+                      );
+                      if (catSnapshot.isDragging) {
+                        return createPortal(catEl, document.body);
+                      }
+                      return catEl;
+                    }}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
               </div>
-            ))}
-
-            <div className="border-t border-[#F1F1F1] py-3">
-              <button
-                type="button"
-                onClick={() => setCreatingBonusCat(cat)}
-                className={`flex h-[38px] items-center gap-2 px-4 ${yellowBtn}`}
-              >
-                <Plus size={15} /> Добавить бонус
-              </button>
-            </div>
-          </div>
-        ))}
+            )}
+          </Droppable>
+        </DragDropContext>
       </AdminShellCard>
 
       {creatingCat && (
@@ -467,6 +559,86 @@ function PartnerBonusModal({
         </button>
       </div>
     </AdminModal>
+  );
+}
+
+// ─── BonusRow (portal-aware draggable) ───────────────────────────────────────
+
+function BonusRow({
+  bonus: b,
+  index,
+  containerRef,
+  run,
+  onEdit,
+  onDelete,
+}: {
+  bonus: AdminPartnerBonus;
+  index: number;
+  containerRef: React.RefObject<HTMLElement | null>;
+  run: (action: () => Promise<unknown>) => Promise<void>;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Draggable draggableId={`bonus-${b.id}`} index={index}>
+      {(bp, snapshot) => {
+        const containerWidth = containerRef.current?.getBoundingClientRect().width;
+        const rowEl = (
+          <div
+            ref={bp.innerRef}
+            {...bp.draggableProps}
+            style={{
+              ...bp.draggableProps.style,
+              ...(snapshot.isDragging && containerWidth ? { width: containerWidth } : {}),
+            }}
+            className={`flex items-center gap-3 border-t border-[#F1F1F1] py-3 text-[14px] text-[#3A3A46] ${
+              snapshot.isDragging ? "rounded-lg bg-white shadow-md" : "bg-white"
+            }`}
+          >
+            <div
+              {...bp.dragHandleProps}
+              className="w-[32px] shrink-0 flex items-center justify-center cursor-grab text-[#D4D4D4] hover:text-[#6E6E73]"
+            >
+              <GripVertical size={16} />
+            </div>
+            <div className="w-[60px] shrink-0">
+              <AdminSwitch
+                checked={b.isPublished}
+                onChange={() =>
+                  run(() =>
+                    adminPartnerBonusesApi.update(b.id, { isPublished: !b.isPublished })
+                  )
+                }
+              />
+            </div>
+            <div className="w-[22%] shrink-0 flex items-center gap-2 truncate pr-2">
+              {b.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={b.logoUrl}
+                  alt=""
+                  className="h-7 w-7 shrink-0 rounded-[6px] bg-[#F3F4F6] object-contain"
+                />
+              ) : null}
+              <span className="truncate font-medium text-[#111827]">{b.companyName}</span>
+            </div>
+            <div className="w-[15%] shrink-0 truncate pr-2 text-[#6E6E73]">{b.city || "—"}</div>
+            <div className="w-[64px] shrink-0 font-semibold">{b.discountPercent}%</div>
+            <div className="flex-1 min-w-0 truncate pr-2">{b.description}</div>
+            <div className="w-[12%] shrink-0">{fmtDate(b.startDate)}</div>
+            <div className="w-[12%] shrink-0">{fmtDate(b.endDate)}</div>
+            <div className="w-[72px] shrink-0">
+              <RowActions onEdit={onEdit} onDelete={onDelete} />
+            </div>
+          </div>
+        );
+
+        if (snapshot.isDragging) {
+          return createPortal(rowEl, document.body);
+        }
+        return rowEl;
+      }}
+    </Draggable>
   );
 }
 

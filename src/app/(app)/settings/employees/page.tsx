@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { Switch } from "../../../components/ui/Switch";
 import { ApiError, employeesApi, type Employee } from "../../../lib/api";
 import { useBranchesStore } from "../../../lib/branchesStore";
@@ -70,9 +71,6 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     if (!selectedBranchId) {
-      setItems([]);
-      setLoading(false);
-      setError(null);
       return;
     }
 
@@ -169,6 +167,7 @@ export default function EmployeesPage() {
     name: string;
     active: boolean;
     profiles: string[];
+    profilePlatforms: string[];
   }) => {
     if (!selectedBranchId) return;
 
@@ -180,6 +179,7 @@ export default function EmployeesPage() {
           name: payload.name,
           active: payload.active,
           profiles: payload.profiles,
+          profilePlatforms: payload.profilePlatforms,
         });
 
         setItems((prev) =>
@@ -190,6 +190,7 @@ export default function EmployeesPage() {
           name: payload.name,
           active: payload.active,
           profiles: payload.profiles,
+          profilePlatforms: payload.profilePlatforms,
         });
 
         setItems((prev) => [created, ...prev]);
@@ -338,6 +339,131 @@ export default function EmployeesPage() {
   );
 }
 
+const PLATFORMS = [
+  {
+    id: "yandex_maps",
+    name: "Яндекс Карты",
+    icon: "/Icons/platforms/yandex-maps-logo.svg",
+  },
+  {
+    id: "google_maps",
+    name: "Google Maps",
+    icon: "/Icons/platforms/google-maps-sign-logo.svg",
+  },
+  {
+    id: "2gis",
+    name: "2ГИС",
+    icon: "/Icons/platforms/2gis-icon-logo.svg",
+  },
+  {
+    id: "prodoctorov",
+    name: "ПроДокторов",
+    icon: "/Icons/platforms/prodoctorov_logo.svg",
+  },
+  {
+    id: "napopravku",
+    name: "НаПоправку",
+    icon: "/Icons/platforms/napopravku_logo.svg",
+  },
+  {
+    id: "other",
+    name: "Другая ссылка",
+    icon: "/Icons/platforms/link.svg",
+  },
+] as const;
+
+type PlatformId = (typeof PLATFORMS)[number]["id"];
+const PLATFORM_IDS = new Set<string>(PLATFORMS.map((platform) => platform.id));
+
+function toPlatformId(value: string | undefined): PlatformId {
+  return value && PLATFORM_IDS.has(value) ? (value as PlatformId) : "other";
+}
+
+function PlatformIcon({ src, alt }: { src: string; alt: string }) {
+  return (
+    <span className="flex h-[31px] w-[31px] shrink-0 items-center justify-center overflow-hidden rounded-[6px]">
+      <Image src={src} alt={alt} width={31} height={31} className="h-full w-full object-contain" />
+    </span>
+  );
+}
+
+function PlatformDropdown({
+  value,
+  onChange,
+}: {
+  value: PlatformId;
+  onChange: (value: PlatformId) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selected =
+    PLATFORMS.find((platform) => platform.id === value) ??
+    PLATFORMS[PLATFORMS.length - 1];
+
+  return (
+    <div className="relative h-full shrink-0">
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className="flex h-full w-[94px] items-center justify-center gap-3 rounded-l-[8px] text-[#4B5563] transition hover:bg-black/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10"
+        aria-label={`Площадка: ${selected.name}`}
+      >
+        <PlatformIcon src={selected.icon} alt={selected.name} />
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0 text-[#4B5563]">
+          <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 top-full z-20 mt-1 w-[190px] rounded-[10px] border border-[#E5E7EB] bg-white py-1 shadow-lg">
+            {PLATFORMS.map((platform) => (
+              <button
+                key={platform.id}
+                type="button"
+                onClick={() => {
+                  onChange(platform.id);
+                  setIsOpen(false);
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-[#111827] transition hover:bg-[#F3F4F6]"
+              >
+                <PlatformIcon src={platform.icon} alt={platform.name} />
+                {platform.name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ProfileLinkInput({
+  value,
+  platform,
+  ariaLabel,
+  onValueChange,
+  onPlatformChange,
+}: {
+  value: string;
+  platform: PlatformId;
+  ariaLabel: string;
+  onValueChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onPlatformChange: (value: PlatformId) => void;
+}) {
+  return (
+    <div className="flex h-[58px] w-full items-center rounded-[8px] bg-[#F3F4F6] transition focus-within:ring-2 focus-within:ring-black/10">
+      <PlatformDropdown value={platform} onChange={onPlatformChange} />
+      <input
+        value={value}
+        onChange={onValueChange}
+        aria-label={ariaLabel}
+        className="h-full min-w-0 flex-1 bg-transparent px-3 text-[20px] text-[#2F2F2F] outline-none placeholder:text-[#9CA3AF]"
+      />
+    </div>
+  );
+}
+
 function EmployeeModal({
   title,
   initial,
@@ -352,64 +478,89 @@ function EmployeeModal({
     name: string;
     active: boolean;
     profiles: string[];
+    profilePlatforms: string[];
   }) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [profile1, setProfile1] = useState(initial?.profiles[0] ?? "");
   const [profile2, setProfile2] = useState(initial?.profiles[1] ?? "");
 
+  const [platform1, setPlatform1] = useState<PlatformId>(
+    toPlatformId(initial?.profilePlatforms[0])
+  );
+  const [platform2, setPlatform2] = useState<PlatformId>(
+    toPlatformId(initial?.profilePlatforms[1])
+  );
+
   const submit = () => {
-    const profiles = [profile1.trim(), profile2.trim()].filter(Boolean);
+    const profileRows = [
+      { url: profile1.trim(), platform: platform1 },
+      { url: profile2.trim(), platform: platform2 },
+    ].filter((profile) => profile.url);
 
     onSave({
       id: initial?.id,
       name: name.trim(),
       active: initial?.active ?? true,
-      profiles,
+      profiles: profileRows.map((profile) => profile.url),
+      profilePlatforms: profileRows.map((profile) => profile.platform),
     });
   };
 
+  const handleProfile1Change = (e: ChangeEvent<HTMLInputElement>) => {
+    setProfile1(e.target.value);
+  };
+
+  const handleProfile2Change = (e: ChangeEvent<HTMLInputElement>) => {
+    setProfile2(e.target.value);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center px-4">
-      <div className="w-full max-w-[520px] rounded-[12px] border border-[#E5E7EB] bg-white p-5 shadow-[0_18px_40px_rgba(17,24,39,0.18)]">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/20 px-4 backdrop-blur-[2px]">
+      <div className="w-full max-w-[520px] rounded-[12px] border border-[#E5E7EB] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)]">
         <div className="flex items-start justify-between gap-3">
-          <div className="text-[14px] font-semibold text-[#111827]">
+          <div className="text-[16px] font-semibold text-[#111827]">
             {title}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-[#6B7280] hover:bg-[#F3F4F6]"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6]"
           >
-            ✕
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
           </button>
         </div>
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-5 space-y-4">
           <div>
-            <div className="text-[12px] text-[#6B7280]">ФИО</div>
+            <div className="mb-1.5 text-[12px] font-medium text-[#111827]">ФИО</div>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 h-10 w-full rounded-[10px] border border-[#E5E7EB] px-3 text-[14px] text-[#111827] outline-none focus:ring-2 focus:ring-black/10"
+              className="h-[58px] w-full rounded-[8px] bg-[#F3F4F6] px-5 text-[20px] text-[#2F2F2F] outline-none transition focus:ring-2 focus:ring-black/10"
               placeholder="Введите ФИО"
             />
           </div>
 
           <div>
-            <div className="text-[12px] text-[#6B7280]">Ссылки на профили</div>
-            <div className="mt-1 space-y-2">
-              <input
+            <div className="mb-1.5 text-[12px] font-medium text-[#111827]">Ссылки на профили</div>
+            <div className="space-y-2.5">
+              <ProfileLinkInput
                 value={profile1}
-                onChange={(e) => setProfile1(e.target.value)}
-                className="h-10 w-full rounded-[10px] border border-[#E5E7EB] px-3 text-[14px] text-[#111827] outline-none focus:ring-2 focus:ring-black/10"
-                placeholder="URL профиля 1"
+                platform={platform1}
+                ariaLabel="Ссылка на профиль 1"
+                onValueChange={handleProfile1Change}
+                onPlatformChange={setPlatform1}
               />
-              <input
+
+              <ProfileLinkInput
                 value={profile2}
-                onChange={(e) => setProfile2(e.target.value)}
-                className="h-10 w-full rounded-[10px] border border-[#E5E7EB] px-3 text-[14px] text-[#111827] outline-none focus:ring-2 focus:ring-black/10"
-                placeholder="URL профиля 2"
+                platform={platform2}
+                ariaLabel="Ссылка на профиль 2"
+                onValueChange={handleProfile2Change}
+                onPlatformChange={setPlatform2}
               />
             </div>
           </div>
@@ -419,9 +570,9 @@ function EmployeeModal({
           type="button"
           onClick={submit}
           disabled={!name.trim()}
-          className="mt-5 h-10 w-full rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] hover:bg-yellow-300 active:brightness-90 disabled:opacity-60"
+          className="mt-6 h-[42px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:bg-yellow-300 active:brightness-90 disabled:opacity-60"
         >
-          Сохранить
+          {initial ? "Сохранить" : "Добавить сотрудника"}
         </button>
       </div>
     </div>
