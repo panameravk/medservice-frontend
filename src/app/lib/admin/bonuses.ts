@@ -14,6 +14,18 @@ export interface AdminBranchBonus {
   sortOrder: number;
 }
 
+export interface AdminPartnerOffer {
+  id: number;
+  partnerBonusId: number;
+  isPublished: boolean;
+  discountPercent: number;
+  description: string;
+  startDate: string | null;
+  endDate: string | null;
+  promoCode: string | null;
+  sortOrder: number;
+}
+
 export interface AdminPartnerBonus {
   id: number;
   categoryId: number;
@@ -21,13 +33,9 @@ export interface AdminPartnerBonus {
   companyName: string;
   logoUrl: string | null;
   city: string;
-  discountPercent: number;
-  description: string;
-  startDate: string | null;
-  endDate: string | null;
-  promoCode: string | null;
   websiteUrl: string | null;
   sortOrder: number;
+  offers: AdminPartnerOffer[];
 }
 
 export interface AdminBonusCategory {
@@ -68,13 +76,18 @@ export type PartnerBonusInput = {
   companyName?: string;
   logoUrl?: string | null;
   city?: string;
-  discountPercent?: number;
-  description?: string;
-  startDate?: string | null;
-  endDate?: string | null;
-  promoCode?: string | null;
   websiteUrl?: string | null;
   sortOrder?: number;
+  offers?: Array<{
+    id?: number;
+    isPublished: boolean;
+    discountPercent: number;
+    description: string;
+    startDate: string | null;
+    endDate: string | null;
+    promoCode: string | null;
+    sortOrder: number;
+  }>;
 };
 
 export type CategoryInput = {

@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- The initial branch-scoped API load owns this local state. */
+
 import { useCallback, useEffect, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { AdminModal } from "../../components/admin/AdminModal";
@@ -16,6 +18,7 @@ import {
   type BranchBonus,
 } from "../../lib/api";
 import { useBranchesStore } from "../../lib/branchesStore";
+import { openDatePicker } from "../../lib/datePicker";
 
 // ── shared classes ───────────────────────────────────────────────────────────
 
@@ -387,8 +390,9 @@ function BonusModal({
             <input
               type="date"
               value={startDate}
+              onClick={(event) => openDatePicker(event.currentTarget)}
               onChange={(e) => setStartDate(e.target.value)}
-              className={inputCls}
+              className={`${inputCls} cursor-pointer`}
             />
           </div>
           <div>
@@ -396,8 +400,9 @@ function BonusModal({
             <input
               type="date"
               value={endDate}
+              onClick={(event) => openDatePicker(event.currentTarget)}
               onChange={(e) => setEndDate(e.target.value)}
-              className={inputCls}
+              className={`${inputCls} cursor-pointer`}
             />
           </div>
         </div>

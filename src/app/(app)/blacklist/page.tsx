@@ -281,11 +281,6 @@ function BlacklistContent({ branchId }: { branchId: string }) {
                       }}
                       surfaceClassName="bg-white border-[#E5E7EB] py-1.5"
                     />
-                    {editForm.phone && !editPhoneCanonical && (
-                      <span className="mt-1 block text-[11px] text-red-500">
-                        Некорректный номер
-                      </span>
-                    )}
                   </div>
                   <div className="flex flex-col gap-1">
                     <input

@@ -17,6 +17,13 @@ interface BranchDto {
   isActive: boolean;
   paidUntil: string | null;
   employeesCount: number;
+  firstUser: {
+    id: number;
+    username: string;
+    email: string;
+    phone: string | null;
+    role: string | null;
+  } | null;
 }
 
 interface UserDto {
@@ -52,6 +59,7 @@ function mapBranch(b: BranchDto): AdminBranch {
     complaintEmails: b.complaintEmails ?? [],
     reminderEmails: b.reminderEmails ?? [],
     platformUrls: b.platformUrls ?? {},
+    firstUser: b.firstUser ?? null,
   };
 }
 
@@ -102,6 +110,13 @@ export const adminBranchesApi = {
     phone: string | null;
     specialization: string;
     timezone: string;
+    firstUser: {
+      username: string;
+      email: string;
+      password: string;
+      phone: string;
+      role: string;
+    };
   }): Promise<AdminBranch> {
     const branch = await apiFetch<BranchDto>("/branches", {
       ...ADMIN_SESSION,
@@ -113,6 +128,13 @@ export const adminBranchesApi = {
         phone: payload.phone,
         specialization: payload.specialization,
         timezone: payload.timezone,
+        first_user: {
+          username: payload.firstUser.username,
+          email: payload.firstUser.email,
+          password: payload.firstUser.password,
+          phone: payload.firstUser.phone,
+          role: payload.firstUser.role,
+        },
       },
     });
     return mapBranch(branch);
@@ -133,6 +155,13 @@ export const adminBranchesApi = {
       complaintEmails: string[];
       reminderEmails: string[];
       platformUrls: Record<string, string>;
+      firstUser: {
+        username: string;
+        email: string;
+        phone: string;
+        role: string;
+        password?: string;
+      };
     }>
   ): Promise<AdminBranch> {
     const body: Record<string, unknown> = {};
@@ -150,6 +179,17 @@ export const adminBranchesApi = {
     if ("complaintEmails" in payload) body.complaint_emails = payload.complaintEmails;
     if ("reminderEmails" in payload) body.reminder_emails = payload.reminderEmails;
     if ("platformUrls" in payload) body.platform_urls = payload.platformUrls;
+    if (payload.firstUser) {
+      body.first_user = {
+        username: payload.firstUser.username,
+        email: payload.firstUser.email,
+        phone: payload.firstUser.phone,
+        role: payload.firstUser.role,
+        ...(payload.firstUser.password
+          ? { password: payload.firstUser.password }
+          : {}),
+      };
+    }
 
     const branch = await apiFetch<BranchDto>(`/branches/${id}`, {
       ...ADMIN_SESSION,

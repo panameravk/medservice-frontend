@@ -51,7 +51,7 @@ export function AdminModal({
     >
       <div
         className={[
-          "animate-modal relative w-full rounded-[16px] border border-[#E5E7EB] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)]",
+          "animate-modal relative max-h-[calc(100vh-32px)] w-full overflow-y-auto rounded-[16px] border border-[#E5E7EB] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)]",
           widthClassName,
         ].join(" ")}
         onClick={(e) => e.stopPropagation()}

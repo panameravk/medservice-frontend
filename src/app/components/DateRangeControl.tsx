@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { getDateRangeByPeriod, type Period } from "../lib/date";
+import { openDatePicker } from "../lib/datePicker";
 
 const PRESETS: Array<{ value: Period; label: string }> = [
   { value: "week", label: "Неделя" },
@@ -68,9 +69,7 @@ function DateField({
     const input = inputRef.current;
     if (!input) return;
 
-    if (typeof input.showPicker === "function") {
-      input.showPicker();
-    } else {
+    if (!openDatePicker(input)) {
       input.click();
     }
   };

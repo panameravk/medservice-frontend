@@ -1,5 +1,13 @@
 import { apiFetch } from "./client";
 
+export interface BranchFirstUser {
+  id: number;
+  username: string;
+  email: string;
+  phone: string | null;
+  role: string | null;
+}
+
 export interface Branch {
   id: string;
   name: string;
@@ -19,6 +27,7 @@ export interface Branch {
   smsMonthlyLimit: number | null;
   avgRating: number;
   npsScore: number;
+  firstUser: BranchFirstUser | null;
 }
 
 type BranchDto = {
@@ -40,6 +49,7 @@ type BranchDto = {
   smsMonthlyLimit: number | null;
   avgRating: number;
   npsScore: number;
+  firstUser?: BranchFirstUser | null;
 };
 
 type BranchUpdatePayload = Partial<{
@@ -63,6 +73,7 @@ function mapBranchDto(branch: BranchDto): Branch {
   return {
     ...branch,
     id: String(branch.id),
+    firstUser: branch.firstUser ?? null,
   };
 }
 

@@ -21,6 +21,10 @@ import {
   type BranchAnalyticsRow,
 } from "../../lib/api";
 import { LEGAL_LINKS } from "../../lib/legal";
+import {
+  getCanonicalPhone,
+  PhoneInput,
+} from "../../components/PhoneInput";
 
 const unbounded = Unbounded({
   subsets: ["cyrillic"],
@@ -144,8 +148,6 @@ export default function BranchesPage() {
 
   // Модалка «Настроить аккаунт» — та же, что в шапке внутри (app).
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
-  const [accEmail, setAccEmail] = useState("");
-  const [accPassword, setAccPassword] = useState("");
   const [accName, setAccName] = useState("");
   const [accPhone, setAccPhone] = useState("");
   const [accRole, setAccRole] = useState("");
@@ -183,8 +185,6 @@ export default function BranchesPage() {
   }, [resetBranchesStore, router]);
 
   const openAccountSettings = () => {
-    setAccEmail(userEmail);
-    setAccPassword("");
     setAccName(userName === "..." ? "" : userName);
     setAccPhone(userPhone ?? "");
     setAccRole(userRole ?? "");
@@ -195,13 +195,8 @@ export default function BranchesPage() {
   const handleAccountSave = async () => {
     if (accSaving) return;
 
-    const password = accPassword.trim();
-    if (password && password.length < 8) {
-      setAccError("Пароль должен быть не короче 8 символов");
-      return;
-    }
-    if (!accEmail.trim()) {
-      setAccError("Email не может быть пустым");
+    const phoneCanonical = getCanonicalPhone(accPhone);
+    if (accPhone.trim() && !phoneCanonical) {
       return;
     }
 
@@ -209,14 +204,11 @@ export default function BranchesPage() {
     setAccSaving(true);
     try {
       const updated = await authApi.updateMe({
-        email: accEmail.trim(),
         fullName: accName.trim() || null,
-        phone: accPhone.trim() || null,
+        phone: phoneCanonical,
         role: accRole.trim() || null,
-        ...(password ? { password } : {}),
       });
       setUserName(updated.fullName || updated.username);
-      setUserEmail(updated.email);
       setUserPhone(updated.phone);
       setUserRole(updated.role);
       setIsAccountSettingsOpen(false);
@@ -560,32 +552,6 @@ export default function BranchesPage() {
               <div className="space-y-[17px]">
                 <div>
                   <label className="mb-[8px] block text-[13px] font-medium text-[#111827]">
-                    Email-логин
-                  </label>
-                  <input
-                    type="email"
-                    value={accEmail}
-                    onChange={(e) => setAccEmail(e.target.value)}
-                    placeholder="email@example.com"
-                    className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF]"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-[8px] block text-[13px] font-medium text-[#111827]">
-                    Пароль
-                  </label>
-                  <input
-                    type="password"
-                    value={accPassword}
-                    onChange={(e) => setAccPassword(e.target.value)}
-                    placeholder="Оставьте пустым, чтобы не менять"
-                    className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF]"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-[8px] block text-[13px] font-medium text-[#111827]">
                     Имя
                   </label>
                   <input
@@ -601,12 +567,11 @@ export default function BranchesPage() {
                   <label className="mb-[8px] block text-[13px] font-medium text-[#111827]">
                     Телефон
                   </label>
-                  <input
-                    type="tel"
+                  <PhoneInput
                     value={accPhone}
-                    onChange={(e) => setAccPhone(e.target.value)}
-                    placeholder="+7 999 000 00 00"
-                    className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF]"
+                    onChange={(next, meta) =>
+                      setAccPhone(meta.canonical ?? next)
+                    }
                   />
                 </div>
 
@@ -642,7 +607,10 @@ export default function BranchesPage() {
                 <button
                   type="button"
                   onClick={() => void handleAccountSave()}
-                  disabled={accSaving}
+                  disabled={
+                    accSaving ||
+                    (!!accPhone.trim() && !getCanonicalPhone(accPhone))
+                  }
                   className="mt-[2px] h-[44px] w-full rounded-[9px] bg-black text-[13px] font-medium text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {accSaving ? "Сохраняем..." : "Сохранить"}

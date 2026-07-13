@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AdminModal } from "../../components/admin/AdminModal";
 import { AdminShellCard } from "../../components/admin/AdminShellCard";
+import { getCanonicalPhone, PhoneInput } from "../../components/PhoneInput";
 import { adminAccessApi } from "../../lib/admin/api";
 import type { AdminAccessUser } from "../../types/admin";
 
@@ -219,6 +220,8 @@ function AccessModal({
   const [phone, setPhone] = useState(initial?.phone ?? "");
 
   const isEditing = !!initial;
+  const phoneCanonical = getCanonicalPhone(phone);
+  const phoneInvalid = !!phone.trim() && !phoneCanonical;
 
   return (
     <AdminModal onClose={onClose}>
@@ -287,10 +290,9 @@ function AccessModal({
           <label className="mb-2 block text-[13px] font-medium text-[#222222]">
             Телефон
           </label>
-          <input
+          <PhoneInput
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none"
+            onChange={(next, meta) => setPhone(meta.canonical ?? next)}
           />
         </div>
 
@@ -313,12 +315,13 @@ function AccessModal({
               password: password,
               role: role.trim() || null,
               email: email.trim(),
-              phone: phone.trim() || null,
+              phone: phoneCanonical,
               isSuperuser: true,
               branchIds: [],
             })
           }
-          className="mt-2 h-[48px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95"
+          disabled={phoneInvalid}
+          className="mt-2 h-[48px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isEditing ? "Сохранить изменения" : "Создать администратора"}
         </button>

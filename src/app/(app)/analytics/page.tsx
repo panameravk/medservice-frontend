@@ -1,5 +1,8 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/static-components -- Existing dashboard effects intentionally reset and load branch-scoped state. */
+
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   Area,
@@ -19,6 +22,7 @@ import {
 } from "../../lib/api";
 import { useBranchesStore } from "../../lib/branchesStore";
 import { getDateRangeByPeriod } from "../../lib/date";
+import { openDatePicker } from "../../lib/datePicker";
 
 function EmptyState({ text }: { text: string }) {
   return <p className="text-[13px] text-[#9CA3AF]">{text}</p>;
@@ -53,8 +57,8 @@ function PlatformIcon({ platform }: { platform: string }) {
     yandex_maps: "/Icons/platforms/yandex-maps-logo.svg",
     google_maps: "/Icons/platforms/google-maps-sign-logo.svg",
     "2gis": "/Icons/platforms/2gis-icon-logo.svg",
-    prodoctorov: "/Icons/platforms/prodoctorov_logo.svg",
-    napopravku: "/Icons/platforms/napopravku_logo.svg",
+    prodoctorov: "/Icons/platforms/prodoktorov.svg",
+    napopravku: "/Icons/platforms/napopravku.svg",
   };
 
   const src = iconMap[platform];
@@ -98,7 +102,18 @@ function PlatformToggle({
   );
 }
 
-function RatingBadge({ value }: { value: number }) {
+function RatingBadge({ value }: { value: number | null }) {
+  if (value === null) {
+    return (
+      <span
+        title="Площадка не вернула рейтинг при последнем парсинге"
+        className="inline-flex min-w-[40px] items-center justify-center rounded-[6px] bg-[#F3F4F6] px-2.5 py-[2px] text-[15px] font-medium text-[#6B7280]"
+      >
+        —
+      </span>
+    );
+  }
+
   const cls =
     value >= 4.7
       ? "bg-[#DDF7E7] text-[#1F8F52]"
@@ -125,7 +140,7 @@ function NegativeBadge({ value }: { value: number }) {
 
   return (
     <span
-      className={`inline-flex min-w-[40px] items-center justify-center rounded-[6px] px-2.5 py-[2px] text-[15px] font-medium ${cls}`}
+      className={`inline-flex w-[48px] items-center justify-center rounded-[6px] py-[2px] text-[15px] font-medium tabular-nums ${cls}`}
     >
       {value}%
     </span>
@@ -142,26 +157,23 @@ function SatisfactionSection({
 
   return (
     <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
-      <div className="mb-1 flex items-baseline justify-between">
-        <div className="text-[14px] font-medium text-[#111827]">
-          Удовлетворённость
-        </div>
-        <div className="text-[12px] text-[#6B7280]">
-          {totalCount} {pluralize(totalCount, "оценка", "оценки", "оценок")}
-        </div>
+      <div className="text-[14px] font-medium text-[#111827]">
+        Удовлетворённость
       </div>
 
       {totalCount === 0 ? (
-        <EmptyState text="Нет данных по оценкам" />
+        <div className="mt-2">
+          <EmptyState text="Нет данных по оценкам" />
+        </div>
       ) : (
         <div className="mt-2 space-y-[8px]">
           {data.map((item) => {
             const barColor =
               item.stars === 5
-                ? "#2DBE60"
+                ? "#18B77E"
                 : item.stars === 4
-                ? "#E7B81D"
-                : "#E74C3C";
+                ? "#FFC328"
+                : "#C8191E";
 
             const isHovered = hovered === item.stars;
 
@@ -170,7 +182,7 @@ function SatisfactionSection({
                 key={item.stars}
                 onMouseEnter={() => setHovered(item.stars)}
                 onMouseLeave={() => setHovered(null)}
-                className="grid cursor-default grid-cols-[18px_1fr_90px] items-center gap-3"
+                className="grid cursor-default grid-cols-[18px_10px_minmax(0,1fr)_40px] items-center gap-x-2"
                 title={`${item.count} ${pluralize(
                   item.count,
                   "оценка",
@@ -178,10 +190,20 @@ function SatisfactionSection({
                   "оценок"
                 )}`}
               >
-                <div className="text-[12px] text-[#111827]">{item.stars}</div>
-                <div className="h-[3px] rounded-full bg-[#D9E1EA]">
+                <div className="text-[14px] leading-none text-[#111827]">
+                  {item.stars}
+                </div>
+                <Image
+                  src="/Icons/satisfaction.svg"
+                  alt=""
+                  aria-hidden="true"
+                  width={10}
+                  height={10}
+                  className="h-[10px] w-[10px] shrink-0"
+                />
+                <div className="h-[3px] overflow-hidden rounded-full bg-[#E3E8EF]">
                   <div
-                    className="h-[3px] rounded-full transition-all duration-200"
+                    className="h-full transition-opacity duration-200"
                     style={{
                       width: `${item.percent}%`,
                       backgroundColor: barColor,
@@ -189,10 +211,8 @@ function SatisfactionSection({
                     }}
                   />
                 </div>
-                <div className="flex items-center justify-end gap-1 text-[12px] text-[#111827] tabular-nums">
-                  <span className="text-[#6B7280]">{item.count}</span>
-                  <span className="text-[#D1D5DB]">·</span>
-                  <span>{Math.round(item.percent)}%</span>
+                <div className="text-right text-[14px] leading-none text-[#111827] tabular-nums">
+                  {Math.round(item.percent)}%
                 </div>
               </div>
             );
@@ -539,6 +559,7 @@ export default function AnalyticsPage() {
         <input
           type="date"
           value={value}
+          onClick={(event) => openDatePicker(event.currentTarget)}
           onChange={(e) => onChange(e.target.value)}
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
         />
@@ -773,7 +794,7 @@ export default function AnalyticsPage() {
           <div className="h-[210px] rounded-[12px] bg-white/70" />
         </div>
       ) : !dashboard ? null : (
-        <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,4fr)]">
           <div className="space-y-4">
             <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
               <div className="grid grid-cols-4 gap-6">
@@ -811,9 +832,13 @@ export default function AnalyticsPage() {
                     <tr className="text-[15px] font-medium text-[#111827]">
                       <th className="w-[169px] pb-2.5">Площадка</th>
                       <th className="w-[88px] pb-2.5">Рейтинг</th>
-                      <th className="w-[88px] pb-2.5">Отзывы</th>
-                      <th className="w-[119px] pb-2.5">Всего отзывов</th>
-                      <th className="w-[106px] pb-2.5">Всего негатива</th>
+                      <th className="w-[88px] pb-2.5 text-center">Отзывы</th>
+                      <th className="w-[119px] pb-2.5 text-center">
+                        Всего отзывов
+                      </th>
+                      <th className="w-[106px] pb-2.5 text-center">
+                        Всего негатива
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -822,7 +847,7 @@ export default function AnalyticsPage() {
                         key={item.platform}
                         className="text-[15px] text-[#111827]"
                       >
-                        <td className="py-[6px] pr-2.5">
+                        <td className="h-[40px] py-[6px] pr-2.5 align-middle">
                           <div className="flex items-center gap-2.5">
                             <PlatformToggle
                               enabled={
@@ -844,14 +869,20 @@ export default function AnalyticsPage() {
                             <span className="truncate">{item.label}</span>
                           </div>
                         </td>
-                        <td className="py-[6px]">
+                        <td className="h-[40px] py-[6px] align-middle tabular-nums">
                           <RatingBadge value={item.rating} />
                         </td>
-                        <td className="py-[6px]">{item.reviews}</td>
-                        <td className="py-[6px]">{item.totalReviews}</td>
-                        <td className="py-[6px]">
-                          <div className="flex items-center gap-2.5">
-                            <span>{item.totalNegative}</span>
+                        <td className="h-[40px] py-[6px] text-center align-middle tabular-nums">
+                          {item.reviews}
+                        </td>
+                        <td className="h-[40px] py-[6px] text-center align-middle tabular-nums">
+                          {item.totalReviews}
+                        </td>
+                        <td className="h-[40px] py-[6px] align-middle">
+                          <div className="mx-auto grid w-fit grid-cols-[24px_48px] items-center gap-2.5">
+                            <span className="text-right tabular-nums">
+                              {item.totalNegative}
+                            </span>
                             <NegativeBadge
                               value={Math.round(item.negativePercent)}
                             />
@@ -955,42 +986,44 @@ export default function AnalyticsPage() {
             </section>
           </div>
 
-          <aside className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
-            <div className="mb-3 text-[14px] font-medium text-[#111827]">
-              Новые отзывы
-            </div>
+          <div className="relative min-h-0">
+            <aside className="flex min-h-0 flex-col rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3 xl:absolute xl:inset-0 xl:overflow-hidden">
+              <div className="mb-3 text-[14px] font-medium text-[#111827]">
+                Новые отзывы
+              </div>
 
-            <div className="max-h-[calc(100vh-215px)] space-y-4 overflow-y-auto pr-1">
-              {dashboard.recentReviews.length === 0 ? (
-                <EmptyState text="Нет отзывов за выбранный период" />
-              ) : (
-                dashboard.recentReviews.map((review) => (
-                  <article key={review.id}>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
-                      <span className="font-medium text-[#111827]">
-                        {review.reviewerName || "Аноним"}
-                      </span>
-                      <span className="text-[#A3A3A3]">
-                        {review.publishedAt
-                          ? new Date(review.publishedAt).toLocaleDateString(
-                              "ru-RU"
-                            )
-                          : ""}
-                      </span>
-                      <span className="ml-auto text-[#6B7280] underline underline-offset-2">
-                        {review.platformLabel}
-                      </span>
-                      <ReviewStars rating={review.rating} />
-                    </div>
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+                {dashboard.recentReviews.length === 0 ? (
+                  <EmptyState text="Нет отзывов за выбранный период" />
+                ) : (
+                  dashboard.recentReviews.map((review) => (
+                    <article key={review.id}>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+                        <span className="font-medium text-[#111827]">
+                          {review.reviewerName || "Аноним"}
+                        </span>
+                        <span className="text-[#A3A3A3]">
+                          {review.publishedAt
+                            ? new Date(review.publishedAt).toLocaleDateString(
+                                "ru-RU"
+                              )
+                            : ""}
+                        </span>
+                        <span className="ml-auto text-[#6B7280] underline underline-offset-2">
+                          {review.platformLabel}
+                        </span>
+                        <ReviewStars rating={review.rating} />
+                      </div>
 
-                    <p className="mt-1 text-[12px] leading-[15px] text-[#111827]">
-                      {review.text || "Без текста"}
-                    </p>
-                  </article>
-                ))
-              )}
-            </div>
-          </aside>
+                      <p className="mt-1 text-[12px] leading-[15px] text-[#111827]">
+                        {review.text || "Без текста"}
+                      </p>
+                    </article>
+                  ))
+                )}
+              </div>
+            </aside>
+          </div>
         </div>
       )}
     </div>

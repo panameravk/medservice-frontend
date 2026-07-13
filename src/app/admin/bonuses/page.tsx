@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- The initial admin catalog load owns this local state. */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Plus, Trash2, GripVertical } from "lucide-react";
@@ -14,6 +16,7 @@ import {
   type AdminBonusCategory,
   type AdminPartnerBonus,
 } from "../../lib/admin/bonuses";
+import { openDatePicker } from "../../lib/datePicker";
 
 const inputCls =
   "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition";
@@ -197,8 +200,8 @@ function PartnersTab({
           <div className="w-[60px]">Опубл.</div>
           <div className="w-[22%]">Компания</div>
           <div className="w-[15%]">Город</div>
-          <div className="w-[64px]">Скидка</div>
-          <div className="flex-1">Описание</div>
+          <div className="w-[120px]">Предложения</div>
+          <div className="flex-1">Скидки</div>
           <div className="w-[12%]">Дата начала</div>
           <div className="w-[12%]">Дата окончания</div>
           <div className="w-[72px]" />
@@ -336,7 +339,7 @@ function PartnersTab({
       {deletingBonus && (
         <DeleteConfirm
           title="Удалить бонус?"
-          message={`Бонус «${deletingBonus.companyName}» будет удалён.`}
+          message={`Компания «${deletingBonus.companyName}» и все её предложения (${deletingBonus.offers.length}) будут удалены.`}
           onClose={() => setDeletingBonus(null)}
           onConfirm={() =>
             run(() => adminPartnerBonusesApi.delete(deletingBonus.id)).then(() =>
@@ -395,6 +398,29 @@ function CategoryModal({
   );
 }
 
+type EditablePartnerOffer = {
+  key: string;
+  id?: number;
+  isPublished: boolean;
+  discountPercent: number;
+  description: string;
+  startDate: string;
+  endDate: string;
+  promoCode: string;
+};
+
+function emptyPartnerOffer(): EditablePartnerOffer {
+  return {
+    key: `new-${Date.now()}-${Math.random()}`,
+    isPublished: true,
+    discountPercent: 20,
+    description: "",
+    startDate: "",
+    endDate: "",
+    promoCode: "",
+  };
+}
+
 function PartnerBonusModal({
   title,
   submitLabel,
@@ -414,31 +440,60 @@ function PartnerBonusModal({
     categoryId: number;
     companyName: string;
     city: string;
-    discountPercent: number;
-    description: string;
-    startDate: string | null;
-    endDate: string | null;
-    promoCode: string | null;
     websiteUrl: string | null;
     logoUrl: string | null;
     isPublished: boolean;
     sortOrder: number;
+    offers: Array<{
+      id?: number;
+      isPublished: boolean;
+      discountPercent: number;
+      description: string;
+      startDate: string | null;
+      endDate: string | null;
+      promoCode: string | null;
+      sortOrder: number;
+    }>;
   }) => void;
 }) {
   const [catId, setCatId] = useState(categoryId);
   const [company, setCompany] = useState(initial?.companyName ?? "");
   const [logo, setLogo] = useState<string | null>(initial?.logoUrl ?? null);
   const [city, setCity] = useState(initial?.city ?? "");
-  const [discount, setDiscount] = useState(initial?.discountPercent ?? 20);
-  const [description, setDescription] = useState(initial?.description ?? "");
-  const [startDate, setStartDate] = useState(initial?.startDate ?? "");
-  const [endDate, setEndDate] = useState(initial?.endDate ?? "");
-  const [promo, setPromo] = useState(initial?.promoCode ?? "");
   const [website, setWebsite] = useState(initial?.websiteUrl ?? "");
   const [published, setPublished] = useState(initial?.isPublished ?? true);
+  const [offers, setOffers] = useState<EditablePartnerOffer[]>(
+    initial?.offers.length
+      ? initial.offers.map((offer) => ({
+          key: `offer-${offer.id}`,
+          id: offer.id,
+          isPublished: offer.isPublished,
+          discountPercent: offer.discountPercent,
+          description: offer.description,
+          startDate: offer.startDate ?? "",
+          endDate: offer.endDate ?? "",
+          promoCode: offer.promoCode ?? "",
+        }))
+      : [emptyPartnerOffer()]
+  );
+
+  const updateOffer = (
+    index: number,
+    patch: Partial<Omit<EditablePartnerOffer, "key" | "id">>
+  ) => {
+    setOffers((current) =>
+      current.map((offer, offerIndex) =>
+        offerIndex === index ? { ...offer, ...patch } : offer
+      )
+    );
+  };
+
+  const hasInvalidDates = offers.some(
+    (offer) => offer.startDate && offer.endDate && offer.startDate > offer.endDate
+  );
 
   return (
-    <AdminModal onClose={onClose} widthClassName="max-w-[460px]" title={title}>
+    <AdminModal onClose={onClose} widthClassName="max-w-[700px]" title={title}>
       <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
         <div>
           <label className={labelCls}>Название компании</label>
@@ -471,57 +526,6 @@ function PartnerBonusModal({
             <input value={city} onChange={(e) => setCity(e.target.value)} className={inputCls} />
           </div>
           <div>
-            <label className={labelCls}>Размер скидки (%)</label>
-            <select
-              value={discount}
-              onChange={(e) => setDiscount(Number(e.target.value))}
-              className={selectCls}
-            >
-              {DISCOUNT_OPTIONS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label className={labelCls}>Описание</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className={textareaCls}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>Дата начала</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <label className={labelCls}>Дата окончания</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={inputCls}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>Промокод</label>
-            <input value={promo} onChange={(e) => setPromo(e.target.value)} className={inputCls} />
-          </div>
-          <div>
             <label className={labelCls}>Сайт</label>
             <input
               value={website}
@@ -534,23 +538,147 @@ function PartnerBonusModal({
 
         <PublishedRow value={published} onChange={setPublished} />
 
+        <div className="border-t border-[#E5E7EB] pt-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-[15px] font-semibold text-[#111827]">Предложения</h3>
+              <p className="mt-0.5 text-[12px] text-[#6E6E73]">
+                Все предложения будут показаны внутри одной карточки компании.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOffers((current) => [...current, emptyPartnerOffer()])}
+              className={`flex h-[38px] shrink-0 items-center gap-2 px-3 ${yellowBtn}`}
+            >
+              <Plus size={15} /> Добавить предложение
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {offers.map((offer, index) => {
+              const invalidDates =
+                offer.startDate && offer.endDate && offer.startDate > offer.endDate;
+              return (
+                <div
+                  key={offer.key}
+                  className="rounded-[12px] border border-[#E5E7EB] bg-[#FCFCFC] p-4"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-[14px] font-semibold text-[#111827]">
+                      Предложение {index + 1}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={offers.length === 1}
+                      onClick={() =>
+                        setOffers((current) => current.filter((_, i) => i !== index))
+                      }
+                      className="flex h-8 w-8 items-center justify-center rounded-[8px] text-[#A3A3A3] transition hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30"
+                      aria-label={`Удалить предложение ${index + 1}`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Размер скидки (%)</label>
+                      <select
+                        value={offer.discountPercent}
+                        onChange={(e) =>
+                          updateOffer(index, { discountPercent: Number(e.target.value) })
+                        }
+                        className={selectCls}
+                      >
+                        {DISCOUNT_OPTIONS.map((discount) => (
+                          <option key={discount} value={discount}>
+                            {discount}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Промокод</label>
+                      <input
+                        value={offer.promoCode}
+                        onChange={(e) => updateOffer(index, { promoCode: e.target.value })}
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <label className={labelCls}>Описание</label>
+                    <textarea
+                      value={offer.description}
+                      onChange={(e) => updateOffer(index, { description: e.target.value })}
+                      className={textareaCls}
+                    />
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Дата начала</label>
+                      <input
+                        type="date"
+                        value={offer.startDate}
+                        onClick={(event) => openDatePicker(event.currentTarget)}
+                        onChange={(e) => updateOffer(index, { startDate: e.target.value })}
+                        className={`${inputCls} cursor-pointer`}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Дата окончания</label>
+                      <input
+                        type="date"
+                        value={offer.endDate}
+                        onClick={(event) => openDatePicker(event.currentTarget)}
+                        onChange={(e) => updateOffer(index, { endDate: e.target.value })}
+                        className={`${inputCls} cursor-pointer`}
+                      />
+                    </div>
+                  </div>
+                  {invalidDates && (
+                    <p className="mt-2 text-[12px] text-red-600">
+                      Дата окончания не может быть раньше даты начала.
+                    </p>
+                  )}
+
+                  <div className="mt-3">
+                    <PublishedRow
+                      value={offer.isPublished}
+                      onChange={(value) => updateOffer(index, { isPublished: value })}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         <button
           type="button"
-          disabled={!company.trim()}
+          disabled={!company.trim() || hasInvalidDates}
           onClick={() =>
             onSave({
               categoryId: catId,
               companyName: company.trim(),
               city: city.trim(),
-              discountPercent: discount,
-              description: description.trim(),
-              startDate: startDate || null,
-              endDate: endDate || null,
-              promoCode: promo.trim() || null,
               websiteUrl: website.trim() || null,
               logoUrl: logo,
               isPublished: published,
               sortOrder: initial?.sortOrder ?? 0,
+              offers: offers.map((offer, index) => ({
+                ...(offer.id ? { id: offer.id } : {}),
+                isPublished: offer.isPublished,
+                discountPercent: offer.discountPercent,
+                description: offer.description.trim(),
+                startDate: offer.startDate || null,
+                endDate: offer.endDate || null,
+                promoCode: offer.promoCode.trim() || null,
+                sortOrder: index,
+              })),
             })
           }
           className={saveBtnCls}
@@ -583,6 +711,15 @@ function BonusRow({
     <Draggable draggableId={`bonus-${b.id}`} index={index}>
       {(bp, snapshot) => {
         const containerWidth = containerRef.current?.getBoundingClientRect().width;
+        const discounts = b.offers.map((offer) => `${offer.discountPercent}%`).join(", ");
+        const startDates = b.offers
+          .map((offer) => offer.startDate)
+          .filter((value): value is string => Boolean(value))
+          .sort();
+        const endDates = b.offers
+          .map((offer) => offer.endDate)
+          .filter((value): value is string => Boolean(value))
+          .sort();
         const rowEl = (
           <div
             ref={bp.innerRef}
@@ -623,10 +760,14 @@ function BonusRow({
               <span className="truncate font-medium text-[#111827]">{b.companyName}</span>
             </div>
             <div className="w-[15%] shrink-0 truncate pr-2 text-[#6E6E73]">{b.city || "—"}</div>
-            <div className="w-[64px] shrink-0 font-semibold">{b.discountPercent}%</div>
-            <div className="flex-1 min-w-0 truncate pr-2">{b.description}</div>
-            <div className="w-[12%] shrink-0">{fmtDate(b.startDate)}</div>
-            <div className="w-[12%] shrink-0">{fmtDate(b.endDate)}</div>
+            <div className="w-[120px] shrink-0 font-medium">
+              {b.offers.length} шт.
+            </div>
+            <div className="min-w-0 flex-1 truncate pr-2 font-semibold">{discounts}</div>
+            <div className="w-[12%] shrink-0">{fmtDate(startDates[0] ?? null)}</div>
+            <div className="w-[12%] shrink-0">
+              {fmtDate(endDates[endDates.length - 1] ?? null)}
+            </div>
             <div className="w-[72px] shrink-0">
               <RowActions onEdit={onEdit} onDelete={onDelete} />
             </div>

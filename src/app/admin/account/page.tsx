@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AdminModal } from "../../components/admin/AdminModal";
 import { AdminShellCard } from "../../components/admin/AdminShellCard";
+import { getCanonicalPhone, PhoneInput } from "../../components/PhoneInput";
 import { adminAccountApi } from "../../lib/admin/api";
 import type { AdminAccount } from "../../types/admin";
 
@@ -111,6 +112,8 @@ function AccountModal({
   const [email, setEmail] = useState(initial.email);
   const [phone, setPhone] = useState(initial.phone ?? "");
   const [role, setRole] = useState(initial.role ?? "");
+  const phoneCanonical = getCanonicalPhone(phone);
+  const phoneInvalid = !!phone.trim() && !phoneCanonical;
 
   return (
     <AdminModal onClose={onClose} widthClassName="max-w-[450px]">
@@ -152,10 +155,9 @@ function AccountModal({
           <label className="mb-2 block text-[13px] font-medium text-[#222222]">
             Телефон
           </label>
-          <input
+          <PhoneInput
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none"
+            onChange={(next, meta) => setPhone(meta.canonical ?? next)}
           />
         </div>
 
@@ -165,11 +167,12 @@ function AccountModal({
             onSave({
               fullName: fullName.trim() || null,
               email: email.trim(),
-              phone: phone.trim() || null,
+              phone: phoneCanonical,
               role: role.trim() || null,
             })
           }
-          className="mt-2 h-[48px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95"
+          disabled={phoneInvalid}
+          className="mt-2 h-[48px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Сохранить изменения
         </button>

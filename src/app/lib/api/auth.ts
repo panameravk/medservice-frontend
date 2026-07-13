@@ -14,11 +14,8 @@ export interface AuthUser {
 
 export interface UpdateMePayload {
   fullName?: string | null;
-  email?: string;
   phone?: string | null;
   role?: string | null;
-  /** Если задан — пароль будет заменён. */
-  password?: string;
 }
 
 export interface LoginResponse {
@@ -61,10 +58,8 @@ export const authApi = {
   updateMe: (payload: UpdateMePayload) => {
     const body: Record<string, unknown> = {};
     if ("fullName" in payload) body.full_name = payload.fullName;
-    if ("email" in payload) body.email = payload.email;
     if ("phone" in payload) body.phone = payload.phone;
     if ("role" in payload) body.role = payload.role;
-    if (payload.password) body.password = payload.password;
 
     return apiFetch<AuthUser>("/auth/me", {
       method: "PATCH",

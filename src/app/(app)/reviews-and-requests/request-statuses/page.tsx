@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- Branch changes intentionally reset and reload request data. */
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {

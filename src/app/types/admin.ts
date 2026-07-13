@@ -16,6 +16,13 @@ export type AdminBranch = {
   complaintEmails: string[];
   reminderEmails: string[];
   platformUrls: Record<string, string>;
+  firstUser: {
+    id: number;
+    username: string;
+    email: string;
+    phone: string | null;
+    role: string | null;
+  } | null;
 };
 
 export type AdminAccessUser = {

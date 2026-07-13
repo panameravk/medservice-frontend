@@ -12,6 +12,8 @@ import {
 } from "../../lib/api";
 import { useBranchesStore } from "../../lib/branchesStore";
 
+const EMPLOYEE_REVIEW_HOSTS = ["prodoctorov.ru", "napopravku.ru"];
+
 export default function RequestFeedbackPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
 
@@ -125,10 +127,11 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
     );
   };
 
-  const getProdoctorovProfileUrl = (employee: Employee): string | null =>
-    employee.profiles.find((url) =>
-      url.trim().toLowerCase().includes("prodoctorov.ru")
-    ) ?? null;
+  const hasEmployeeReviewProfile = (employee: Employee): boolean =>
+    employee.profiles.some((url) => {
+      const normalizedUrl = url.trim().toLowerCase();
+      return EMPLOYEE_REVIEW_HOSTS.some((host) => normalizedUrl.includes(host));
+    });
 
   const handleSubmitRequest = async () => {
     setRequestLoading(true);
@@ -137,10 +140,6 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
     setRequestWarning(null);
 
     try {
-      const selectedProdoctorovUrl = selectedEmployee
-        ? getProdoctorovProfileUrl(selectedEmployee)
-        : null;
-
       if (selectedEmployeeId !== null && !selectedEmployee) {
         setRequestError("Выбранный сотрудник не найден");
         return;
@@ -151,9 +150,9 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
         return;
       }
 
-      if (selectedEmployee && !selectedProdoctorovUrl) {
+      if (selectedEmployee && !hasEmployeeReviewProfile(selectedEmployee)) {
         setRequestError(
-          "У выбранного сотрудника нужно заполнить ссылку на ПроДокторов"
+          "У выбранного сотрудника нужно заполнить ссылку на ПроДокторов или НаПоправку"
         );
         return;
       }
@@ -279,11 +278,6 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
                   setPhoneCanonical(meta.canonical);
                 }}
               />
-              {phone && !phoneCanonical && (
-                <p className="mt-1 text-[11px] text-red-500">
-                  Введите корректный номер телефона
-                </p>
-              )}
             </div>
 
             <div>
@@ -400,11 +394,6 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
               }}
               surfaceClassName="bg-[#F3F4F6]"
             />
-            {blPhone && !blPhoneCanonical && (
-              <p className="mt-1 text-[11px] text-red-500">
-                Введите корректный номер телефона
-              </p>
-            )}
           </div>
 
           <div>

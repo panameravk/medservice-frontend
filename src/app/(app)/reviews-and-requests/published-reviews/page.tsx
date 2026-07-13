@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- Branch and filter changes intentionally reset paginated data. */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBranchesStore } from "../../../lib/branchesStore";
 import { getReviews, type Review } from "../../../lib/api";

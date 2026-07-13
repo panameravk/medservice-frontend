@@ -8,6 +8,11 @@ import {
   type BranchAccessUser,
 } from "../../../lib/api";
 import { useBranchesStore } from "../../../lib/branchesStore";
+import { AdminModal } from "../../../components/admin/AdminModal";
+import {
+  getCanonicalPhone,
+  PhoneInput,
+} from "../../../components/PhoneInput";
 
 type MemberFormPayload = {
   id?: number;
@@ -73,16 +78,27 @@ function MemberModal({
   const [phone, setPhone] = useState(initial?.phone ?? "");
 
   const isEditing = !!initial;
+  const phoneCanonical = getCanonicalPhone(phone);
   const canSave =
     fullName.trim() &&
     role.trim() &&
     email.trim() &&
-    phone.trim() &&
+    phoneCanonical &&
     (isEditing || (username.trim() && password.length >= 8));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4">
-      <div className="w-full max-w-[420px] space-y-4 rounded-[16px] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)]">
+    <AdminModal
+      onClose={onClose}
+      widthClassName="max-w-[460px]"
+      title={isEditing ? "Редактировать доступ" : "Выдать доступ к филиалу"}
+    >
+      <div className="space-y-4">
+        {!isEditing && (
+          <p className="text-[12px] leading-[17px] text-[#6B7280]">
+            Будет создан отдельный пользователь с доступом только к этому филиалу.
+          </p>
+        )}
+
         <div>
           <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
             ФИО
@@ -153,12 +169,9 @@ function MemberModal({
           <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
             Телефон
           </label>
-          <input
-            type="tel"
+          <PhoneInput
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
-            placeholder="+7 999 000 00 00"
+            onChange={(next, meta) => setPhone(meta.canonical ?? next)}
           />
         </div>
 
@@ -172,7 +185,7 @@ function MemberModal({
               password,
               role: role.trim(),
               email: email.trim(),
-              phone: phone.trim(),
+              phone: phoneCanonical ?? "",
             })
           }
           disabled={!canSave}
@@ -189,12 +202,13 @@ function MemberModal({
           Отмена
         </button>
       </div>
-    </div>
+    </AdminModal>
   );
 }
 
 export default function AccessPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
+  const branches = useBranchesStore((s) => s.branches);
   const [members, setMembers] = useState<BranchAccessUser[]>([]);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -207,6 +221,13 @@ export default function AccessPage() {
     if (members.length === 0) return "Нет участников команды";
     return null;
   }, [loading, members.length]);
+
+  const firstUserId = useMemo(
+    () =>
+      branches.find((branch) => branch.id === selectedBranchId)?.firstUser?.id ??
+      null,
+    [branches, selectedBranchId]
+  );
 
   useEffect(() => {
     if (!selectedBranchId) {
@@ -333,6 +354,7 @@ export default function AccessPage() {
           <div className="divide-y divide-[#F3F4F6]">
             {members.map((member) => {
               const isCurrentUser = member.id === currentUserId;
+              const isFirstUser = member.id === firstUserId;
 
               return (
                 <div
@@ -357,29 +379,33 @@ export default function AccessPage() {
                     {member.phone || "—"}
                   </span>
                   <div className="flex items-center justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditing(member);
-                        setModalOpen(true);
-                      }}
-                      disabled={isCurrentUser}
-                      className="text-[#9CA3AF] transition-colors hover:text-[#111827] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-[#9CA3AF]"
-                      title="Редактировать"
-                    >
-                      <IconEdit />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void handleRevoke(member);
-                      }}
-                      disabled={isCurrentUser}
-                      className="text-[#9CA3AF] transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-[#9CA3AF]"
-                      title="Отозвать доступ"
-                    >
-                      <IconTrash />
-                    </button>
+                    {!isFirstUser && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditing(member);
+                            setModalOpen(true);
+                          }}
+                          disabled={isCurrentUser}
+                          className="text-[#9CA3AF] transition-colors hover:text-[#111827] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-[#9CA3AF]"
+                          title="Редактировать"
+                        >
+                          <IconEdit />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleRevoke(member);
+                          }}
+                          disabled={isCurrentUser}
+                          className="text-[#9CA3AF] transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-[#9CA3AF]"
+                          title="Отозвать доступ"
+                        >
+                          <IconTrash />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               );

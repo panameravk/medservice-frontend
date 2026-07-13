@@ -12,6 +12,8 @@ import { getAccessToken, setTokens } from "../../lib/api";
 import { setImpersonation } from "../../lib/impersonation";
 import { useBranchesStore } from "../../lib/branchesStore";
 import type { AdminBranch } from "../../types/admin";
+import { openDatePicker } from "../../lib/datePicker";
+import { getCanonicalPhone, PhoneInput } from "../../components/PhoneInput";
 
 const PLATFORM_FIELDS: Array<{ key: string; label: string; placeholder: string }> = [
   {
@@ -125,6 +127,7 @@ export default function AdminBranchesPage() {
 
   const closeCreate = () => {
     setCreateOpen(false);
+    setError(null);
     router.replace("/admin/branches", { scroll: false });
   };
 
@@ -136,6 +139,7 @@ export default function AdminBranchesPage() {
       closeCreate();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка при создании");
+      throw e;
     }
   };
 
@@ -292,6 +296,7 @@ export default function AdminBranchesPage() {
         <CreateBranchModal
           onClose={closeCreate}
           onSave={onCreate}
+          error={error}
         />
       )}
 
@@ -300,6 +305,7 @@ export default function AdminBranchesPage() {
           branch={editingBranch}
           onClose={() => setEditingBranch(null)}
           onSave={(payload) => onUpdate(editingBranch.id, payload)}
+          error={error}
         />
       )}
 
@@ -344,6 +350,7 @@ const TIMEZONES = [
 function CreateBranchModal({
   onClose,
   onSave,
+  error,
 }: {
   onClose: () => void;
   onSave: (payload: {
@@ -353,7 +360,15 @@ function CreateBranchModal({
     phone: string | null;
     specialization: string;
     timezone: string;
-  }) => void;
+    firstUser: {
+      username: string;
+      email: string;
+      password: string;
+      phone: string;
+      role: string;
+    };
+  }) => Promise<void>;
+  error: string | null;
 }) {
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
@@ -361,6 +376,23 @@ function CreateBranchModal({
   const [phone, setPhone] = useState("");
   const [specialization, setSpecialization] = useState(SPECIALIZATIONS[0]);
   const [timezone, setTimezone] = useState(TIMEZONES[0]);
+  const [username, setUsername] = useState("");
+  const [userPhone, setUserPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const phoneCanonical = getCanonicalPhone(phone);
+  const userPhoneCanonical = getCanonicalPhone(userPhone);
+
+  const canSubmit =
+    name.trim() &&
+    username.trim() &&
+    userPhoneCanonical &&
+    (!phone.trim() || phoneCanonical) &&
+    email.trim() &&
+    password.length >= 8 &&
+    role.trim();
 
   const inputCls =
     "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition";
@@ -368,8 +400,35 @@ function CreateBranchModal({
     "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition appearance-none cursor-pointer";
 
   return (
-    <AdminModal onClose={onClose} widthClassName="max-w-[520px]" title="Создать филиал">
-      <div className="space-y-4">
+    <AdminModal onClose={onClose} widthClassName="max-w-[620px]" title="Создать филиал">
+      <form
+        className="space-y-4"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (!canSubmit || isSubmitting) return;
+
+          setIsSubmitting(true);
+          try {
+            await onSave({
+              name: name.trim(),
+              city: city.trim() || null,
+              address: address.trim() || null,
+              phone: phoneCanonical,
+              specialization,
+              timezone,
+              firstUser: {
+                username: username.trim(),
+                email: email.trim(),
+                password,
+                phone: userPhoneCanonical ?? "",
+                role: role.trim(),
+              },
+            });
+          } catch {
+            setIsSubmitting(false);
+          }
+        }}
+      >
         <div>
           <label className="mb-2 block text-[13px] font-medium text-[#222222]">
             Название <span className="text-red-500">*</span>
@@ -379,6 +438,7 @@ function CreateBranchModal({
             onChange={(e) => setName(e.target.value)}
             placeholder="Счастливый взгляд, Невский пр. 12"
             className={inputCls}
+            required
           />
         </div>
 
@@ -396,13 +456,11 @@ function CreateBranchModal({
           </div>
           <div>
             <label className="mb-2 block text-[13px] font-medium text-[#222222]">
-              Телефон
+              Телефон филиала
             </label>
-            <input
+            <PhoneInput
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+7 999 000 11 22"
-              className={inputCls}
+              onChange={(next, meta) => setPhone(meta.canonical ?? next)}
             />
           </div>
         </div>
@@ -453,24 +511,108 @@ function CreateBranchModal({
           </select>
         </div>
 
+        <div className="border-t border-[#E5E7EB] pt-4">
+          <h3 className="text-[15px] font-semibold text-[#111827]">
+            Первый пользователь
+          </h3>
+          <p className="mt-1 text-[12px] leading-[17px] text-[#6E6E73]">
+            Получит доступ к этому филиалу и сможет войти по логину и паролю.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+              Логин <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="clinic-manager"
+              autoComplete="username"
+              className={inputCls}
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+              Роль в команде <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={role}
+              onChange={(event) => setRole(event.target.value)}
+              placeholder="Руководитель"
+              className={inputCls}
+              required
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+              Email <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="manager@clinic.ru"
+              autoComplete="email"
+              className={inputCls}
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+              Телефон пользователя <span className="text-red-500">*</span>
+            </label>
+            <PhoneInput
+              value={userPhone}
+              onChange={(next, meta) =>
+                setUserPhone(meta.canonical ?? next)
+              }
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+            Пароль <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Не менее 8 символов"
+            autoComplete="new-password"
+            minLength={8}
+            maxLength={72}
+            className={inputCls}
+            required
+          />
+          <p className="mt-1.5 text-[12px] text-[#6E6E73]">
+            От 8 до 72 символов.
+          </p>
+        </div>
+
+        {error && (
+          <div
+            role="alert"
+            className="rounded-[10px] bg-red-50 px-4 py-3 text-[13px] text-red-600"
+          >
+            {error}
+          </div>
+        )}
+
         <button
-          type="button"
-          disabled={!name.trim()}
-          onClick={() =>
-            onSave({
-              name: name.trim(),
-              city: city.trim() || null,
-              address: address.trim() || null,
-              phone: phone.trim() || null,
-              specialization,
-              timezone,
-            })
-          }
+          type="submit"
+          disabled={!canSubmit || isSubmitting}
           className="mt-2 h-[48px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Создать филиал
+          {isSubmitting ? "Создаём филиал…" : "Создать филиал"}
         </button>
-      </div>
+      </form>
     </AdminModal>
   );
 }
@@ -479,6 +621,7 @@ function EditBranchModal({
   branch,
   onClose,
   onSave,
+  error,
 }: {
   branch: AdminBranch;
   onClose: () => void;
@@ -490,7 +633,15 @@ function EditBranchModal({
     smsMonthlyLimit: number | null;
     paidUntil: string | null;
     platformUrls: Record<string, string>;
+    firstUser?: {
+      username: string;
+      email: string;
+      phone: string;
+      role: string;
+      password?: string;
+    };
   }) => void;
+  error: string | null;
 }) {
   const [name, setName] = useState(branch.name);
   const [city, setCity] = useState(branch.city ?? "");
@@ -503,13 +654,30 @@ function EditBranchModal({
     branch.paidUntil ? branch.paidUntil.split("T")[0] : ""
   );
   const [urls, setUrls] = useState<Record<string, string>>({ ...branch.platformUrls });
+  const [username, setUsername] = useState(branch.firstUser?.username ?? "");
+  const [email, setEmail] = useState(branch.firstUser?.email ?? "");
+  const [userPhone, setUserPhone] = useState(branch.firstUser?.phone ?? "");
+  const [role, setRole] = useState(branch.firstUser?.role ?? "");
+  const [newPassword, setNewPassword] = useState("");
+  const phoneCanonical = getCanonicalPhone(phone);
+  const userPhoneCanonical = getCanonicalPhone(userPhone);
 
   const inputCls =
     "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition";
   const selectCls =
     "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition appearance-none cursor-pointer";
 
-  const canSave = name.trim().length > 0;
+  const firstUserIsValid =
+    !branch.firstUser ||
+    (username.trim() &&
+      email.trim() &&
+      userPhoneCanonical &&
+      role.trim() &&
+      (!newPassword || newPassword.length >= 8));
+  const canSave =
+    name.trim().length > 0 &&
+    firstUserIsValid &&
+    (!phone.trim() || phoneCanonical);
 
   const handleSave = () => {
     const cleanedUrls: Record<string, string> = {};
@@ -522,7 +690,7 @@ function EditBranchModal({
     onSave({
       name: name.trim(),
       city: city.trim() || null,
-      phone: phone.trim() || null,
+      phone: phoneCanonical,
       specialization,
       smsMonthlyLimit:
         tariffNum != null && Number.isFinite(tariffNum) && tariffNum >= 0
@@ -530,6 +698,17 @@ function EditBranchModal({
           : null,
       paidUntil: paidUntil || null,
       platformUrls: cleanedUrls,
+      ...(branch.firstUser
+        ? {
+            firstUser: {
+              username: username.trim(),
+              email: email.trim(),
+              phone: userPhoneCanonical ?? "",
+              role: role.trim(),
+              ...(newPassword ? { password: newPassword } : {}),
+            },
+          }
+        : {}),
     });
   };
 
@@ -550,7 +729,10 @@ function EditBranchModal({
           </div>
           <div>
             <label className="mb-2 block text-[13px] font-medium text-[#222222]">Телефон</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
+            <PhoneInput
+              value={phone}
+              onChange={(next, meta) => setPhone(meta.canonical ?? next)}
+            />
           </div>
         </div>
 
@@ -590,8 +772,9 @@ function EditBranchModal({
             <input
               type="date"
               value={paidUntil}
+              onClick={(event) => openDatePicker(event.currentTarget)}
               onChange={(e) => setPaidUntil(e.target.value)}
-              className={inputCls}
+              className={`${inputCls} cursor-pointer`}
             />
           </div>
         </div>
@@ -612,6 +795,104 @@ function EditBranchModal({
             ))}
           </div>
         </div>
+
+        <div className="border-t border-[#ECECEC] pt-4">
+          <h3 className="text-[15px] font-semibold text-[#111827]">
+            Первый пользователь
+          </h3>
+          {branch.firstUser ? (
+            <>
+              <p className="mt-1 text-[12px] leading-[17px] text-[#6E6E73]">
+                Учётная запись, созданная вместе с филиалом.
+              </p>
+
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+                    Логин <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    autoComplete="username"
+                    className={inputCls}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+                    Роль в команде <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={role}
+                    onChange={(event) => setRole(event.target.value)}
+                    className={inputCls}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    autoComplete="email"
+                    className={inputCls}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+                    Телефон пользователя <span className="text-red-500">*</span>
+                  </label>
+                  <PhoneInput
+                    value={userPhone}
+                    onChange={(next, meta) =>
+                      setUserPhone(meta.canonical ?? next)
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+                  Новый пароль
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  placeholder="Оставьте пустым, чтобы не менять"
+                  autoComplete="new-password"
+                  minLength={8}
+                  maxLength={72}
+                  className={inputCls}
+                />
+                <p className="mt-1.5 text-[12px] text-[#6E6E73]">
+                  Если меняете пароль — от 8 до 72 символов.
+                </p>
+              </div>
+            </>
+          ) : (
+            <p className="mt-1 text-[13px] leading-[18px] text-[#6E6E73]">
+              Первый пользователь для этого филиала не найден.
+            </p>
+          )}
+        </div>
+
+        {error && (
+          <div
+            role="alert"
+            className="rounded-[10px] bg-red-50 px-4 py-3 text-[13px] text-red-600"
+          >
+            {error}
+          </div>
+        )}
 
         <button
           type="button"

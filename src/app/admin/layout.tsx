@@ -20,7 +20,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <AdminGuard>
       <div className="min-h-screen bg-[rgba(242,243,244,1)] text-[#111827]">
-        <div className="grid min-h-screen grid-cols-[260px_1fr]">
+        <div className="grid min-h-screen grid-cols-[268px_1fr]">
           <AdminSideBar />
 
           <div className="flex min-h-screen min-w-0 flex-col">

@@ -1,7 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import {
+  type ChangeEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { Switch } from "../../../components/ui/Switch";
 import { ApiError, employeesApi, type Employee } from "../../../lib/api";
 import { useBranchesStore } from "../../../lib/branchesStore";
@@ -212,56 +218,42 @@ export default function EmployeesPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="text-[14px] font-semibold text-[#111827]">
-          Сотрудники
-        </div>
-
-        <button
-          type="button"
-          onClick={openCreate}
-          className="h-10 rounded-[10px] bg-[#F4C21A] px-4 text-[13px] font-semibold text-[#111827] hover:bg-yellow-300 active:brightness-90"
-        >
-          Добавить сотрудника
-        </button>
-      </div>
-
+    <div className="min-h-[470px]">
       {error && (
-        <div className="rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
+        <div className="mb-4 max-w-[560px] rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
           {error}
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-[12px] border border-[#E5E7EB]">
-        <table className="w-full border-collapse bg-white">
+      <div className="max-w-[560px] overflow-x-auto">
+        <table className="w-full table-fixed border-collapse bg-white">
           <thead>
-            <tr className="text-left text-[12px] text-[#6B7280]">
-              <th className="w-[120px] px-4 py-3">Запросы</th>
-              <th className="px-4 py-3">ФИО</th>
-              <th className="px-4 py-3">Профили</th>
-              <th className="w-[120px] px-4 py-3" />
+            <tr className="text-left text-[14px] font-medium text-[#111827]">
+              <th className="w-[96px] pb-3 font-medium">Запросы</th>
+              <th className="w-[285px] pb-3 font-medium">ФИО</th>
+              <th className="w-[110px] pb-3 font-medium">Профили</th>
+              <th className="w-[69px] pb-3" />
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td className="px-4 py-4 text-sm text-[#9CA3AF]" colSpan={4}>
+                <td className="py-3 text-sm text-[#9CA3AF]" colSpan={4}>
                   Загрузка...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td className="px-4 py-4 text-sm text-[#9CA3AF]" colSpan={4}>
+                <td className="py-3 text-sm text-[#9CA3AF]" colSpan={4}>
                   Сотрудников пока нет
                 </td>
               </tr>
             ) : (
               items.map((employee) => (
-                <tr key={employee.id} className="border-t border-[#E5E7EB]">
-                  <td className="px-4 py-3">
-                    <label className="inline-flex items-center gap-2">
+                <tr key={employee.id}>
+                  <td className="h-[36px] py-1 align-middle">
+                    <label className="inline-flex origin-left scale-[0.8] items-center">
                       <Switch
                         checked={employee.active}
                         onChange={() => {
@@ -271,36 +263,24 @@ export default function EmployeesPage() {
                     </label>
                   </td>
 
-                  <td className="px-4 py-3 text-[14px] text-[#111827]">
+                  <td className="h-[36px] truncate py-1 pr-4 align-middle text-[14px] text-[#2F2F2F]">
                     {employee.name}
                   </td>
 
-                  <td className="px-4 py-3">
+                  <td className="h-[36px] py-1 align-middle">
                     {employee.profiles.length === 0 ? (
                       <span className="text-[13px] text-[#9CA3AF]">—</span>
                     ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {employee.profiles.map((url, index) => (
-                          <a
-                            key={`${employee.id}-${index}`}
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-full border border-[#E5E7EB] px-3 py-1 text-[12px] text-[#111827] hover:bg-[#F3F4F6]"
-                          >
-                            {url}
-                          </a>
-                        ))}
-                      </div>
+                      <EmployeeProfileIcons employee={employee} />
                     )}
                   </td>
 
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-3 text-[#A3A3A3]">
+                  <td className="h-[36px] py-1 align-middle">
+                    <div className="flex items-center justify-start gap-2 text-[#929292]">
                       <button
                         type="button"
                         onClick={() => openEdit(employee)}
-                        className="transition hover:text-[#222222]"
+                        className="flex h-6 w-6 items-center justify-center transition hover:text-[#222222]"
                         title="Редактировать"
                       >
                         <EditIcon />
@@ -310,7 +290,7 @@ export default function EmployeesPage() {
                         onClick={() => {
                           void remove(employee.id);
                         }}
-                        className="transition hover:text-red-500"
+                        className="flex h-6 w-6 items-center justify-center transition hover:text-red-500"
                         title="Удалить"
                       >
                         <TrashIcon />
@@ -323,6 +303,14 @@ export default function EmployeesPage() {
           </tbody>
         </table>
       </div>
+
+      <button
+        type="button"
+        onClick={openCreate}
+        className="mt-8 h-10 rounded-[10px] bg-[#FFC51B] px-5 text-[13px] font-semibold text-[#111827] hover:bg-[#FFD044] active:brightness-90"
+      >
+        Добавить сотрудника
+      </button>
 
       {isOpen && (
         <EmployeeModal
@@ -358,12 +346,12 @@ const PLATFORMS = [
   {
     id: "prodoctorov",
     name: "ПроДокторов",
-    icon: "/Icons/platforms/prodoctorov_logo.svg",
+    icon: "/Icons/platforms/prodoktorov.svg",
   },
   {
     id: "napopravku",
     name: "НаПоправку",
-    icon: "/Icons/platforms/napopravku_logo.svg",
+    icon: "/Icons/platforms/napopravku.svg",
   },
   {
     id: "other",
@@ -381,9 +369,48 @@ function toPlatformId(value: string | undefined): PlatformId {
 
 function PlatformIcon({ src, alt }: { src: string; alt: string }) {
   return (
-    <span className="flex h-[31px] w-[31px] shrink-0 items-center justify-center overflow-hidden rounded-[6px]">
-      <Image src={src} alt={alt} width={31} height={31} className="h-full w-full object-contain" />
+    <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center overflow-hidden rounded-[5px]">
+      <Image
+        src={src}
+        alt={alt}
+        width={22}
+        height={22}
+        className="h-full w-full object-contain"
+      />
     </span>
+  );
+}
+
+function EmployeeProfileIcons({ employee }: { employee: Employee }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {employee.profiles.map((url, index) => {
+        const platform =
+          PLATFORMS.find(
+            (item) => item.id === employee.profilePlatforms[index]
+          ) ?? PLATFORMS[PLATFORMS.length - 1];
+
+        return (
+          <a
+            key={`${employee.id}-${index}`}
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            title={platform.name}
+            aria-label={`${platform.name}: ${url}`}
+            className="flex h-5 w-5 items-center justify-center rounded-[4px] transition hover:bg-[#F3F4F6]"
+          >
+            <Image
+              src={platform.icon}
+              alt=""
+              width={16}
+              height={16}
+              className="h-4 w-4 object-contain"
+            />
+          </a>
+        );
+      })}
+    </div>
   );
 }
 
@@ -404,11 +431,11 @@ function PlatformDropdown({
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
-        className="flex h-full w-[94px] items-center justify-center gap-3 rounded-l-[8px] text-[#4B5563] transition hover:bg-black/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10"
+        className="flex h-full w-[70px] items-center justify-center gap-2 rounded-l-[8px] text-[#4B5563] transition hover:bg-black/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10"
         aria-label={`Площадка: ${selected.name}`}
       >
         <PlatformIcon src={selected.icon} alt={selected.name} />
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0 text-[#4B5563]">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" className="shrink-0 text-[#4B5563]">
           <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
@@ -416,7 +443,7 @@ function PlatformDropdown({
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 top-full z-20 mt-1 w-[190px] rounded-[10px] border border-[#E5E7EB] bg-white py-1 shadow-lg">
+          <div className="absolute left-0 top-full z-20 mt-1 w-[180px] rounded-[10px] border border-[#E5E7EB] bg-white py-1 shadow-lg">
             {PLATFORMS.map((platform) => (
               <button
                 key={platform.id}
@@ -452,13 +479,13 @@ function ProfileLinkInput({
   onPlatformChange: (value: PlatformId) => void;
 }) {
   return (
-    <div className="flex h-[58px] w-full items-center rounded-[8px] bg-[#F3F4F6] transition focus-within:ring-2 focus-within:ring-black/10">
+    <div className="flex h-[42px] w-full items-center rounded-[8px] bg-[#F1F2F3] transition focus-within:ring-2 focus-within:ring-black/10">
       <PlatformDropdown value={platform} onChange={onPlatformChange} />
       <input
         value={value}
         onChange={onValueChange}
         aria-label={ariaLabel}
-        className="h-full min-w-0 flex-1 bg-transparent px-3 text-[20px] text-[#2F2F2F] outline-none placeholder:text-[#9CA3AF]"
+        className="h-full min-w-0 flex-1 bg-transparent px-3 text-[14px] text-[#2F2F2F] outline-none placeholder:text-[#9CA3AF]"
       />
     </div>
   );
@@ -515,17 +542,43 @@ function EmployeeModal({
     setProfile2(e.target.value);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/20 px-4 backdrop-blur-[2px]">
-      <div className="w-full max-w-[520px] rounded-[12px] border border-[#E5E7EB] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)]">
-        <div className="flex items-start justify-between gap-3">
-          <div className="text-[16px] font-semibold text-[#111827]">
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="animate-overlay fixed inset-0 z-50 flex items-center justify-center bg-transparent px-4 xl:justify-start xl:pl-[372px]"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="animate-modal relative w-full max-w-[385px] rounded-[10px] border border-[#E2E2E2] bg-white p-[14px] shadow-[0_10px_24px_rgba(17,24,39,0.16)]"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
+        <div className="absolute right-2 top-2">
+          <div className="sr-only">
             {title}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6]"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-[#6B7280] opacity-0 transition hover:bg-[#F3F4F6] hover:opacity-100 focus-visible:opacity-100"
+            aria-label="Закрыть"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 6L6 18M6 6l12 12"/>
@@ -533,20 +586,20 @@ function EmployeeModal({
           </button>
         </div>
 
-        <div className="mt-5 space-y-4">
+        <div className="space-y-3">
           <div>
-            <div className="mb-1.5 text-[12px] font-medium text-[#111827]">ФИО</div>
+            <div className="mb-1 text-[12px] font-medium text-[#111827]">ФИО</div>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-[58px] w-full rounded-[8px] bg-[#F3F4F6] px-5 text-[20px] text-[#2F2F2F] outline-none transition focus:ring-2 focus:ring-black/10"
+              className="h-[42px] w-full rounded-[8px] bg-[#F1F2F3] px-[14px] text-[14px] text-[#2F2F2F] outline-none transition focus:ring-2 focus:ring-black/10"
               placeholder="Введите ФИО"
             />
           </div>
 
           <div>
-            <div className="mb-1.5 text-[12px] font-medium text-[#111827]">Ссылки на профили</div>
-            <div className="space-y-2.5">
+            <div className="mb-1 text-[12px] font-medium text-[#111827]">Ссылки на профили</div>
+            <div className="space-y-1">
               <ProfileLinkInput
                 value={profile1}
                 platform={platform1}
@@ -570,11 +623,12 @@ function EmployeeModal({
           type="button"
           onClick={submit}
           disabled={!name.trim()}
-          className="mt-6 h-[42px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:bg-yellow-300 active:brightness-90 disabled:opacity-60"
+          className="mt-5 h-[42px] w-full rounded-[8px] bg-[#FFC51B] text-[14px] font-semibold text-[#111827] transition hover:bg-[#FFD044] active:brightness-90 disabled:opacity-60"
         >
           {initial ? "Сохранить" : "Добавить сотрудника"}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

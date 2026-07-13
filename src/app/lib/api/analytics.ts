@@ -24,7 +24,7 @@ export interface DashboardData {
     platform: string;
     label: string;
     enabled: boolean;
-    rating: number;
+    rating: number | null;
     reviews: number;
     totalReviews: number;
     totalNegative: number;
