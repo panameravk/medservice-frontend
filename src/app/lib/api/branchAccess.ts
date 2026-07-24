@@ -41,6 +41,12 @@ export const branchAccessApi = {
       body: data,
     }),
 
+  grant: (branchId: string, username: string): Promise<BranchAccessUser> =>
+    apiFetch(`/branch-access/grant${buildQuery({ branch_id: branchId })}`, {
+      method: "POST",
+      body: { username },
+    }),
+
   update: (
     id: number,
     branchId: string,

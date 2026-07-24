@@ -147,6 +147,35 @@ function NegativeBadge({ value }: { value: number }) {
   );
 }
 
+function allocateWholePercentages(
+  data: DashboardData["satisfaction"]
+): number[] {
+  const total = data.reduce((sum, item) => sum + item.count, 0);
+  if (total === 0) return data.map(() => 0);
+
+  const shares = data.map((item, index) => {
+    const exact = (item.count / total) * 100;
+    const value = Math.floor(exact);
+
+    return {
+      index,
+      value,
+      remainder: exact - value,
+    };
+  });
+  const remaining =
+    100 - shares.reduce((sum, share) => sum + share.value, 0);
+  const priority = [...shares].sort(
+    (a, b) => b.remainder - a.remainder || a.index - b.index
+  );
+
+  for (let index = 0; index < remaining; index += 1) {
+    priority[index].value += 1;
+  }
+
+  return shares.map((share) => share.value);
+}
+
 function SatisfactionSection({
   data,
 }: {
@@ -154,6 +183,10 @@ function SatisfactionSection({
 }) {
   const [hovered, setHovered] = useState<number | null>(null);
   const totalCount = data.reduce((acc, item) => acc + item.count, 0);
+  const displayedPercentages = useMemo(
+    () => allocateWholePercentages(data),
+    [data]
+  );
 
   return (
     <section className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3">
@@ -167,7 +200,7 @@ function SatisfactionSection({
         </div>
       ) : (
         <div className="mt-2 space-y-[8px]">
-          {data.map((item) => {
+          {data.map((item, index) => {
             const barColor =
               item.stars === 5
                 ? "#18B77E"
@@ -212,7 +245,7 @@ function SatisfactionSection({
                   />
                 </div>
                 <div className="text-right text-[14px] leading-none text-[#111827] tabular-nums">
-                  {Math.round(item.percent)}%
+                  {displayedPercentages[index]}%
                 </div>
               </div>
             );

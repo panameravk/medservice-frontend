@@ -1,24 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, authApi } from "../../lib/api";
 
 type ViewState = "idle" | "loading" | "success" | "error";
 
 export default function ResetPasswordPage() {
+  const tokenRef = useRef("");
   const [password, setPassword] = useState("");
   const [state, setState] = useState<ViewState>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const getToken = () => {
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("token") ?? "";
-  };
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    // Prefer the fragment used by new emails. Query support keeps already-sent
+    // reset links valid during deployment.
+    const token = fragment.get("token") ?? params.get("token") ?? "";
+
+    // Keep the token only in memory so it does not remain in browser history,
+    // screenshots, the address bar, or subsequent Referer headers.
+    if (token) {
+      tokenRef.current = token;
+      window.history.replaceState(
+        window.history.state,
+        "",
+        window.location.pathname
+      );
+    }
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const token = getToken();
+    const token = tokenRef.current;
 
     if (!token) {
       setError("Ссылка восстановления недействительна.");
@@ -37,6 +52,8 @@ export default function ResetPasswordPage() {
 
     try {
       await authApi.resetPassword(token, password);
+      // The password changed, so discard any session left in this browser.
+      authApi.logout();
       setState("success");
       setPassword("");
     } catch (error: unknown) {

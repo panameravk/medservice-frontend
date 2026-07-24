@@ -90,15 +90,11 @@ function MemberModal({
     <AdminModal
       onClose={onClose}
       widthClassName="max-w-[460px]"
-      title={isEditing ? "Редактировать доступ" : "Выдать доступ к филиалу"}
+      title={
+        isEditing ? "Редактировать доступ" : "Создать нового пользователя"
+      }
     >
       <div className="space-y-4">
-        {!isEditing && (
-          <p className="text-[12px] leading-[17px] text-[#6B7280]">
-            Будет создан отдельный пользователь с доступом только к этому филиалу.
-          </p>
-        )}
-
         <div>
           <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
             ФИО
@@ -128,7 +124,7 @@ function MemberModal({
         {!isEditing && (
           <div>
             <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
-              Временный пароль
+              Пароль
             </label>
             <input
               type="password"
@@ -163,6 +159,9 @@ function MemberModal({
             className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
             placeholder="email@example.com"
           />
+          <p className="mt-1.5 text-[11px] leading-4 text-[#9CA3AF]">
+            На этот адрес отправим ссылку, если пользователь забудет пароль.
+          </p>
         </div>
 
         <div>
@@ -191,7 +190,7 @@ function MemberModal({
           disabled={!canSave}
           className="h-11 w-full rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90 disabled:opacity-50"
         >
-          {isEditing ? "Сохранить" : "Выдать доступ"}
+          {isEditing ? "Сохранить" : "Создать пользователя"}
         </button>
 
         <button
@@ -206,6 +205,93 @@ function MemberModal({
   );
 }
 
+function GrantAccessModal({
+  onClose,
+  onGrant,
+}: {
+  onClose: () => void;
+  onGrant: (username: string) => Promise<void>;
+}) {
+  const [username, setUsername] = useState("");
+  const [granting, setGranting] = useState(false);
+  const [grantError, setGrantError] = useState<string | null>(null);
+
+  const handleGrant = async () => {
+    const normalizedUsername = username.trim();
+    if (!normalizedUsername || granting) return;
+
+    setGranting(true);
+    setGrantError(null);
+
+    try {
+      await onGrant(normalizedUsername);
+    } catch (error) {
+      setGrantError(
+        error instanceof ApiError
+          ? error.message
+          : "Не удалось выдать доступ к филиалу"
+      );
+    } finally {
+      setGranting(false);
+    }
+  };
+
+  return (
+    <AdminModal
+      onClose={onClose}
+      widthClassName="max-w-[460px]"
+      title="Выдать доступ к филиалу"
+    >
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleGrant();
+        }}
+      >
+        <p className="text-[12px] leading-[17px] text-[#6B7280]">
+          Введите логин существующего пользователя. Он получит доступ к выбранному
+          филиалу.
+        </p>
+
+        <div>
+          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
+            Логин
+          </label>
+          <input
+            autoFocus
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
+            placeholder="manager"
+          />
+        </div>
+
+        {grantError && (
+          <p className="text-[13px] text-red-500">{grantError}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={!username.trim() || granting}
+          className="h-11 w-full rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90 disabled:opacity-50"
+        >
+          {granting ? "Выдаём доступ..." : "Выдать доступ"}
+        </button>
+
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={granting}
+          className="w-full text-center text-[13px] text-[#6B7280] transition-colors hover:text-[#111827] disabled:opacity-50"
+        >
+          Отмена
+        </button>
+      </form>
+    </AdminModal>
+  );
+}
+
 export default function AccessPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
   const branches = useBranchesStore((s) => s.branches);
@@ -214,6 +300,7 @@ export default function AccessPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [grantModalOpen, setGrantModalOpen] = useState(false);
   const [editing, setEditing] = useState<BranchAccessUser | null>(null);
 
   const tableMessage = useMemo(() => {
@@ -225,8 +312,9 @@ export default function AccessPage() {
   const firstUserId = useMemo(
     () =>
       branches.find((branch) => branch.id === selectedBranchId)?.firstUser?.id ??
+      members[0]?.id ??
       null,
-    [branches, selectedBranchId]
+    [branches, members, selectedBranchId]
   );
 
   useEffect(() => {
@@ -325,6 +413,18 @@ export default function AccessPage() {
     }
   };
 
+  const handleGrant = async (username: string) => {
+    if (!selectedBranchId) return;
+
+    const granted = await branchAccessApi.grant(selectedBranchId, username);
+    setMembers((prev) =>
+      prev.some((member) => member.id === granted.id)
+        ? prev
+        : [...prev, granted]
+    );
+    setGrantModalOpen(false);
+  };
+
   if (!selectedBranchId) {
     return <p className="text-[14px] text-[#9CA3AF]">Выберите филиал</p>;
   }
@@ -414,16 +514,26 @@ export default function AccessPage() {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => {
-          setEditing(null);
-          setModalOpen(true);
-        }}
-        className="h-12 rounded-[10px] bg-[#F4C21A] px-8 text-[13px] font-medium text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90"
-      >
-        Выдать доступ к филиалу
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setEditing(null);
+            setModalOpen(true);
+          }}
+          className="h-12 rounded-[10px] bg-[#F4C21A] px-8 text-[13px] font-medium text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90"
+        >
+          Создать нового пользователя
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setGrantModalOpen(true)}
+          className="h-12 rounded-[10px] bg-[#111827] px-8 text-[13px] font-medium text-white transition-colors hover:bg-[#1F2937] active:brightness-90"
+        >
+          Выдать доступ
+        </button>
+      </div>
 
       {modalOpen && (
         <MemberModal
@@ -435,6 +545,13 @@ export default function AccessPage() {
           onSave={(payload) => {
             void handleSave(payload);
           }}
+        />
+      )}
+
+      {grantModalOpen && (
+        <GrantAccessModal
+          onClose={() => setGrantModalOpen(false)}
+          onGrant={handleGrant}
         />
       )}
     </div>

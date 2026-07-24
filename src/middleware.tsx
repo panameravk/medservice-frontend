@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const USER_PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password"];
+const RESET_PASSWORD_PATH = "/reset-password";
 const USER_HOME = "/branches";
 const ADMIN_LOGIN_PATH = "/admin/login";
 const ADMIN_HOME = "/admin/branches";
@@ -43,6 +44,16 @@ export function middleware(request: NextRequest) {
   }
 
   const userPublicPath = isUserPublicPath(pathname);
+
+  // A reset link must remain reachable even when the browser has an existing
+  // (or stale) session cookie. Redirecting it would discard the emailed token
+  // before the client has a chance to submit the new password.
+  if (
+    pathname === RESET_PASSWORD_PATH ||
+    pathname.startsWith(`${RESET_PASSWORD_PATH}/`)
+  ) {
+    return NextResponse.next();
+  }
 
   if (!userToken) {
     if (userPublicPath) {
