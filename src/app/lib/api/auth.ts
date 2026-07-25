@@ -77,11 +77,11 @@ export const authApi = {
     clearImpersonation();
   },
 
-  forgotPassword: (username: string) =>
+  forgotPassword: (email: string) =>
     apiFetch<{ message: string }>("/auth/forgot-password", {
       method: "POST",
       auth: false,
-      body: { username },
+      body: { email },
     }),
 
   resetPassword: (token: string, password: string) =>

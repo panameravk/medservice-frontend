@@ -6,18 +6,18 @@ import { ApiError, authApi } from "../../lib/api";
 type ViewState = "idle" | "loading" | "success" | "error";
 
 export default function ForgotPasswordPage() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [state, setState] = useState<ViewState>("idle");
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const normalizedUsername = username.trim();
+    const normalizedEmail = email.trim();
     setError(null);
 
-    if (!normalizedUsername) {
-      setError("Введите логин учётной записи.");
+    if (!normalizedEmail) {
+      setError("Введите email.");
       setState("error");
       return;
     }
@@ -25,7 +25,7 @@ export default function ForgotPasswordPage() {
     setState("loading");
 
     try {
-      await authApi.forgotPassword(normalizedUsername);
+      await authApi.forgotPassword(normalizedEmail);
       setState("success");
     } catch (error: unknown) {
       if (error instanceof ApiError) {
@@ -46,22 +46,18 @@ export default function ForgotPasswordPage() {
         {state === "success" ? (
           <div className="rounded-[12px] bg-[#DCFCE7] px-5 py-6">
             <p className="text-center text-[20px] font-medium leading-[30px] text-[#166534]">
-              Если учётная запись с указанным логином существует, ссылка для
-              восстановления отправлена на email из её профиля.
+              Если учётная запись с указанным email существует, ссылка для
+              восстановления отправлена.
             </p>
           </div>
         ) : (
           <form className="space-y-4" onSubmit={handleSubmit}>
-            <p className="text-[13px] leading-5 text-[#9CA3AF]">
-              Введите логин учётной записи. Ссылку для восстановления отправим
-              на email, указанный в её профиле.
-            </p>
             <input
-              type="text"
-              placeholder="Логин"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              autoComplete="username"
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
               required
               disabled={state === "loading"}
               className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-sm outline-none focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
