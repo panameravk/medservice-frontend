@@ -66,6 +66,7 @@ export async function createRequest(data: {
   clientName: string;
   clientPhone: string;
   clientEmail?: string;
+  resendConfirmed?: boolean;
 }): Promise<{
   id: number;
   branchId: number;

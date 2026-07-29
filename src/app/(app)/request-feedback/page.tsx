@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PhoneInput } from "../../components/PhoneInput";
+import { AdminModal } from "../../components/admin/AdminModal";
 import {
   ApiError,
   blacklistApi,
@@ -13,6 +14,7 @@ import {
 import { useBranchesStore } from "../../lib/branchesStore";
 
 const EMPLOYEE_REVIEW_HOSTS = ["prodoctorov.ru", "napopravku.ru"];
+const REPEAT_REQUEST_MESSAGE = "На этот номер запрос уже отправлялся.";
 
 export default function RequestFeedbackPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
@@ -57,6 +59,7 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
   const [requestLoading, setRequestLoading] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [requestSuccess, setRequestSuccess] = useState(false);
+  const [repeatConfirmationOpen, setRepeatConfirmationOpen] = useState(false);
   const [requestWarning, setRequestWarning] = useState<{
     reason: string;
     link: string | null;
@@ -133,11 +136,15 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
       return EMPLOYEE_REVIEW_HOSTS.some((host) => normalizedUrl.includes(host));
     });
 
-  const handleSubmitRequest = async () => {
+  const handleSubmitRequest = async (resendConfirmed = false) => {
     setRequestLoading(true);
     setRequestError(null);
     setRequestSuccess(false);
     setRequestWarning(null);
+
+    if (resendConfirmed) {
+      setRepeatConfirmationOpen(false);
+    }
 
     try {
       if (selectedEmployeeId !== null && !selectedEmployee) {
@@ -162,6 +169,7 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
         clientName: `${lastName} ${firstName}`.trim(),
         clientPhone: phoneCanonical ?? "",
         ...(selectedEmployee ? { employeeId: selectedEmployee.id } : {}),
+        ...(resendConfirmed ? { resendConfirmed: true } : {}),
       });
 
       setLastName("");
@@ -185,7 +193,14 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
       }
 
     } catch (error) {
-      if (error instanceof ApiError) {
+      if (
+        error instanceof ApiError &&
+        error.status === 409 &&
+        error.message === REPEAT_REQUEST_MESSAGE &&
+        !resendConfirmed
+      ) {
+        setRepeatConfirmationOpen(true);
+      } else if (error instanceof ApiError) {
         setRequestError(error.message);
       } else if (error instanceof Error) {
         setRequestError(error.message);
@@ -442,6 +457,25 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
           </div>
         </div>
       </div>
+
+      {repeatConfirmationOpen && (
+        <AdminModal
+          title={REPEAT_REQUEST_MESSAGE}
+          widthClassName="max-w-[390px]"
+          onClose={() => setRepeatConfirmationOpen(false)}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              void handleSubmitRequest(true);
+            }}
+            disabled={requestLoading}
+            className="w-full rounded-[10px] bg-[#F4C21A] py-3 text-[13px] font-semibold text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90 disabled:opacity-50"
+          >
+            {requestLoading ? "Отправка..." : "Отправить повторно"}
+          </button>
+        </AdminModal>
+      )}
     </div>
   );
 }
