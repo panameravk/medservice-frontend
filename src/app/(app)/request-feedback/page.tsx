@@ -14,7 +14,8 @@ import {
 import { useBranchesStore } from "../../lib/branchesStore";
 
 const EMPLOYEE_REVIEW_HOSTS = ["prodoctorov.ru", "napopravku.ru"];
-const REPEAT_REQUEST_MESSAGE = "На этот номер запрос уже отправлялся.";
+const REPEAT_REQUEST_API_MESSAGE = "На этот номер запрос уже отправлялся.";
+const REPEAT_REQUEST_MODAL_TITLE = "На этот номер запрос уже отправлялся";
 
 export default function RequestFeedbackPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
@@ -196,7 +197,7 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
       if (
         error instanceof ApiError &&
         error.status === 409 &&
-        error.message === REPEAT_REQUEST_MESSAGE &&
+        error.message === REPEAT_REQUEST_API_MESSAGE &&
         !resendConfirmed
       ) {
         setRepeatConfirmationOpen(true);
@@ -460,9 +461,10 @@ function RequestFeedbackContent({ branchId }: { branchId: string }) {
 
       {repeatConfirmationOpen && (
         <AdminModal
-          title={REPEAT_REQUEST_MESSAGE}
+          title={REPEAT_REQUEST_MODAL_TITLE}
           widthClassName="max-w-[390px]"
           onClose={() => setRepeatConfirmationOpen(false)}
+          alignCloseButtonToTop
         >
           <button
             type="button"

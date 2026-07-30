@@ -22,11 +22,13 @@ export function AdminModal({
   onClose,
   widthClassName = "max-w-[450px]",
   title,
+  alignCloseButtonToTop = false,
 }: {
   children: ReactNode;
   onClose: () => void;
   widthClassName?: string;
   title?: string;
+  alignCloseButtonToTop?: boolean;
 }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -65,7 +67,10 @@ export function AdminModal({
           <button
             type="button"
             onClick={onClose}
-            className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-[#A3A3A3] transition hover:bg-[#F3F4F6] hover:text-[#222222]"
+            className={[
+              "ml-auto flex h-8 w-8 items-center justify-center rounded-full text-[#A3A3A3] transition hover:bg-[#F3F4F6] hover:text-[#222222]",
+              alignCloseButtonToTop ? "self-start" : "",
+            ].join(" ")}
             aria-label="Закрыть"
           >
             <XIcon />
