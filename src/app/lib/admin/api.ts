@@ -38,6 +38,30 @@ interface UserDto {
   branchIds: number[];
 }
 
+type AdminBranchCreatePayload = {
+  name: string;
+  city: string | null;
+  address: string | null;
+  phone: string | null;
+  specialization: string;
+  timezone: string;
+} & (
+  | {
+      firstUser: {
+        username: string;
+        email: string;
+        password: string;
+        phone: string;
+        role: string;
+      };
+      existingUserUsername?: never;
+    }
+  | {
+      existingUserUsername: string;
+      firstUser?: never;
+    }
+);
+
 const ADMIN_SESSION = { session: "admin" as const };
 
 function mapBranch(b: BranchDto): AdminBranch {
@@ -103,21 +127,15 @@ export const adminBranchesApi = {
     return mapBranch(updated);
   },
 
-  async create(payload: {
-    name: string;
-    city: string | null;
-    address: string | null;
-    phone: string | null;
-    specialization: string;
-    timezone: string;
-    firstUser: {
-      username: string;
-      email: string;
-      password: string;
-      phone: string;
-      role: string;
-    };
-  }): Promise<AdminBranch> {
+  async checkUser(username: string): Promise<{ exists: boolean }> {
+    return apiFetch<{ exists: boolean }>("/branches/check-user", {
+      ...ADMIN_SESSION,
+      method: "POST",
+      body: { username },
+    });
+  },
+
+  async create(payload: AdminBranchCreatePayload): Promise<AdminBranch> {
     const branch = await apiFetch<BranchDto>("/branches", {
       ...ADMIN_SESSION,
       method: "POST",
@@ -128,13 +146,19 @@ export const adminBranchesApi = {
         phone: payload.phone,
         specialization: payload.specialization,
         timezone: payload.timezone,
-        first_user: {
-          username: payload.firstUser.username,
-          email: payload.firstUser.email,
-          password: payload.firstUser.password,
-          phone: payload.firstUser.phone,
-          role: payload.firstUser.role,
-        },
+        ...(payload.firstUser
+          ? {
+              first_user: {
+                username: payload.firstUser.username,
+                email: payload.firstUser.email,
+                password: payload.firstUser.password,
+                phone: payload.firstUser.phone,
+                role: payload.firstUser.role,
+              },
+            }
+          : {
+              existing_user_username: payload.existingUserUsername,
+            }),
       },
     });
     return mapBranch(branch);

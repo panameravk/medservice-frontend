@@ -353,21 +353,9 @@ function CreateBranchModal({
   error,
 }: {
   onClose: () => void;
-  onSave: (payload: {
-    name: string;
-    city: string | null;
-    address: string | null;
-    phone: string | null;
-    specialization: string;
-    timezone: string;
-    firstUser: {
-      username: string;
-      email: string;
-      password: string;
-      phone: string;
-      role: string;
-    };
-  }) => Promise<void>;
+  onSave: (
+    payload: Parameters<typeof adminBranchesApi.create>[0]
+  ) => Promise<void>;
   error: string | null;
 }) {
   const [name, setName] = useState("");
@@ -382,22 +370,64 @@ function CreateBranchModal({
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userCheckStatus, setUserCheckStatus] = useState<
+    "idle" | "checking" | "existing" | "new"
+  >("idle");
+  const [checkedUsername, setCheckedUsername] = useState<string | null>(null);
+  const [userCheckError, setUserCheckError] = useState<string | null>(null);
   const phoneCanonical = getCanonicalPhone(phone);
   const userPhoneCanonical = getCanonicalPhone(userPhone);
+  const normalizedUsername = username.trim();
+  const checkedUsernameMatches = checkedUsername === normalizedUsername;
 
+  const branchFieldsAreValid = Boolean(
+    name.trim() && (!phone.trim() || phoneCanonical)
+  );
+  const existingUserIsValid =
+    userCheckStatus === "existing" && checkedUsernameMatches;
+  const newUserIsValid = Boolean(
+    userCheckStatus === "new" &&
+      checkedUsernameMatches &&
+      userPhoneCanonical &&
+      email.trim() &&
+      password.length >= 8 &&
+      role.trim()
+  );
   const canSubmit =
-    name.trim() &&
-    username.trim() &&
-    userPhoneCanonical &&
-    (!phone.trim() || phoneCanonical) &&
-    email.trim() &&
-    password.length >= 8 &&
-    role.trim();
+    branchFieldsAreValid && (existingUserIsValid || newUserIsValid);
 
   const inputCls =
     "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition";
   const selectCls =
     "h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none focus:border-[#F4C21A] transition appearance-none cursor-pointer";
+
+  const handleUsernameChange = (nextUsername: string) => {
+    setUsername(nextUsername);
+    setUserCheckStatus("idle");
+    setCheckedUsername(null);
+    setUserCheckError(null);
+  };
+
+  const handleUserCheck = async () => {
+    if (!normalizedUsername || userCheckStatus === "checking") return;
+
+    setUserCheckStatus("checking");
+    setUserCheckError(null);
+
+    try {
+      const result = await adminBranchesApi.checkUser(normalizedUsername);
+      setCheckedUsername(normalizedUsername);
+      setUserCheckStatus(result.exists ? "existing" : "new");
+    } catch (checkError) {
+      setCheckedUsername(null);
+      setUserCheckStatus("idle");
+      setUserCheckError(
+        checkError instanceof Error
+          ? checkError.message
+          : "Не удалось проверить пользователя"
+      );
+    }
+  };
 
   return (
     <AdminModal onClose={onClose} widthClassName="max-w-[620px]" title="Создать филиал">
@@ -409,21 +439,32 @@ function CreateBranchModal({
 
           setIsSubmitting(true);
           try {
-            await onSave({
+            const branchPayload = {
               name: name.trim(),
               city: city.trim() || null,
               address: address.trim() || null,
               phone: phoneCanonical,
               specialization,
               timezone,
-              firstUser: {
-                username: username.trim(),
-                email: email.trim(),
-                password,
-                phone: userPhoneCanonical ?? "",
-                role: role.trim(),
-              },
-            });
+            };
+
+            if (existingUserIsValid && checkedUsername) {
+              await onSave({
+                ...branchPayload,
+                existingUserUsername: checkedUsername,
+              });
+            } else if (newUserIsValid) {
+              await onSave({
+                ...branchPayload,
+                firstUser: {
+                  username: normalizedUsername,
+                  email: email.trim(),
+                  password,
+                  phone: userPhoneCanonical ?? "",
+                  role: role.trim(),
+                },
+              });
+            }
           } catch {
             setIsSubmitting(false);
           }
@@ -527,74 +568,127 @@ function CreateBranchModal({
             </label>
             <input
               value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => handleUsernameChange(event.target.value)}
               placeholder="clinic-manager"
               autoComplete="username"
               className={inputCls}
+              disabled={userCheckStatus === "checking"}
               required
             />
           </div>
-          <div>
-            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
-              Роль в команде <span className="text-red-500">*</span>
-            </label>
-            <input
-              value={role}
-              onChange={(event) => setRole(event.target.value)}
-              placeholder="Руководитель"
-              className={inputCls}
-              required
-            />
-          </div>
+
+          {(userCheckStatus === "idle" ||
+            userCheckStatus === "checking") && (
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => {
+                  void handleUserCheck();
+                }}
+                disabled={!normalizedUsername || userCheckStatus === "checking"}
+                className="h-[46px] w-full rounded-[10px] bg-black text-[14px] font-medium text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed"
+              >
+                {userCheckStatus === "checking"
+                  ? "Проверяем пользователя…"
+                  : "Проверить пользователя"}
+              </button>
+            </div>
+          )}
+
+          {userCheckStatus === "new" && (
+            <div>
+              <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+                Роль в команде <span className="text-red-500">*</span>
+              </label>
+              <input
+                value={role}
+                onChange={(event) => setRole(event.target.value)}
+                placeholder="Руководитель"
+                className={inputCls}
+                required
+              />
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
-              Email <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="manager@clinic.ru"
-              autoComplete="email"
-              className={inputCls}
-              required
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
-              Телефон пользователя <span className="text-red-500">*</span>
-            </label>
-            <PhoneInput
-              value={userPhone}
-              onChange={(next, meta) =>
-                setUserPhone(meta.canonical ?? next)
-              }
-            />
-          </div>
-        </div>
+        {userCheckStatus === "new" && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="manager@clinic.ru"
+                  autoComplete="email"
+                  className={inputCls}
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+                  Телефон пользователя <span className="text-red-500">*</span>
+                </label>
+                <PhoneInput
+                  value={userPhone}
+                  onChange={(next, meta) =>
+                    setUserPhone(meta.canonical ?? next)
+                  }
+                />
+              </div>
+            </div>
 
-        <div>
-          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
-            Пароль <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="Не менее 8 символов"
-            autoComplete="new-password"
-            minLength={8}
-            maxLength={72}
-            className={inputCls}
-            required
-          />
-          <p className="mt-1.5 text-[12px] text-[#6E6E73]">
-            От 8 до 72 символов.
-          </p>
-        </div>
+            <div>
+              <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+                Пароль <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Не менее 8 символов"
+                autoComplete="new-password"
+                minLength={8}
+                maxLength={72}
+                className={inputCls}
+                required
+              />
+              <p className="mt-1.5 text-[12px] text-[#6E6E73]">
+                От 8 до 72 символов.
+              </p>
+            </div>
+          </>
+        )}
+
+        {userCheckStatus === "existing" && (
+          <div
+            role="status"
+            className="rounded-[10px] bg-red-50 px-4 py-3 text-[13px] text-red-600"
+          >
+            Пользователь добавлен
+          </div>
+        )}
+
+        {userCheckStatus === "new" && (
+          <div
+            role="status"
+            className="rounded-[10px] bg-red-50 px-4 py-3 text-[13px] text-red-600"
+          >
+            Такого пользователя нет. Введи данные.
+          </div>
+        )}
+
+        {userCheckError && (
+          <div
+            role="alert"
+            className="rounded-[10px] bg-red-50 px-4 py-3 text-[13px] text-red-600"
+          >
+            {userCheckError}
+          </div>
+        )}
 
         {error && (
           <div
