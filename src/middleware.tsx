@@ -29,6 +29,12 @@ export function middleware(request: NextRequest) {
   const adminToken = request.cookies.get("admin_token")?.value;
   const { pathname } = request.nextUrl;
 
+  // The application root is always an auth entry point. Keeping this explicit
+  // prevents legacy patient routes from resurfacing based on cookie state.
+  if (pathname === "/") {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
   if (isAdminLoginPath(pathname)) {
     if (adminToken) {
       return NextResponse.redirect(new URL(ADMIN_HOME, request.url));
