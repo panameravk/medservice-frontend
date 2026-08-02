@@ -6,6 +6,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PARENT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+MINI_DIR="${PARENT_DIR}/medservice-mini"
 cd "${SCRIPT_DIR}"
 
 # Fail fast on missing/empty deploy config — Compose would otherwise resolve
@@ -27,6 +29,13 @@ esac
 
 echo "[deploy] pulling medservice-frontend"
 git pull --ff-only
+
+if [[ ! -d "${MINI_DIR}/.git" ]]; then
+    echo "[deploy] ERROR: ${MINI_DIR} is not a git repository." >&2
+    exit 1
+fi
+echo "[deploy] pulling medservice-mini"
+git -C "${MINI_DIR}" pull --ff-only
 
 echo "[deploy] building and restarting containers"
 docker compose -f docker-compose.prod.yml up -d --build
