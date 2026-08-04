@@ -28,6 +28,8 @@ const yellowBtn =
   "rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50";
 const saveBtnCls = `mt-2 h-[48px] w-full ${yellowBtn}`;
 
+const DISCOUNT_OPTIONS = Array.from({ length: 20 }, (_, i) => (i + 1) * 5);
+
 // Partner table column widths are handled via flex (see header and row)
 
 function fmtDate(iso: string | null): string {
@@ -400,7 +402,7 @@ type EditablePartnerOffer = {
   key: string;
   id?: number;
   isPublished: boolean;
-  discountPercent: string;
+  discountPercent: number;
   description: string;
   startDate: string;
   endDate: string;
@@ -411,7 +413,7 @@ function emptyPartnerOffer(): EditablePartnerOffer {
   return {
     key: `new-${Date.now()}-${Math.random()}`,
     isPublished: true,
-    discountPercent: "20",
+    discountPercent: 20,
     description: "",
     startDate: "",
     endDate: "",
@@ -466,7 +468,7 @@ function PartnerBonusModal({
           key: `offer-${offer.id}`,
           id: offer.id,
           isPublished: offer.isPublished,
-          discountPercent: String(offer.discountPercent),
+          discountPercent: offer.discountPercent,
           description: offer.description,
           startDate: offer.startDate ?? "",
           endDate: offer.endDate ?? "",
@@ -489,15 +491,6 @@ function PartnerBonusModal({
   const hasInvalidDates = offers.some(
     (offer) => offer.startDate && offer.endDate && offer.startDate > offer.endDate
   );
-  const hasInvalidDiscounts = offers.some((offer) => {
-    const discount = Number(offer.discountPercent);
-    return (
-      offer.discountPercent === "" ||
-      !Number.isInteger(discount) ||
-      discount < 1 ||
-      discount > 100
-    );
-  });
 
   return (
     <AdminModal onClose={onClose} widthClassName="max-w-[700px]" title={title}>
@@ -591,26 +584,19 @@ function PartnerBonusModal({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={labelCls}>Размер скидки (%)</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        step={1}
-                        inputMode="numeric"
+                      <select
                         value={offer.discountPercent}
                         onChange={(e) =>
-                          updateOffer(index, { discountPercent: e.target.value })
+                          updateOffer(index, { discountPercent: Number(e.target.value) })
                         }
-                        className={inputCls}
-                      />
-                      {(offer.discountPercent === "" ||
-                        !Number.isInteger(Number(offer.discountPercent)) ||
-                        Number(offer.discountPercent) < 1 ||
-                        Number(offer.discountPercent) > 100) && (
-                        <p className="mt-1.5 text-[12px] text-red-600">
-                          Введите целое число от 1 до 100.
-                        </p>
-                      )}
+                        className={selectCls}
+                      >
+                        {DISCOUNT_OPTIONS.map((discount) => (
+                          <option key={discount} value={discount}>
+                            {discount}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className={labelCls}>Промокод</label>
@@ -673,7 +659,7 @@ function PartnerBonusModal({
 
         <button
           type="button"
-          disabled={!company.trim() || hasInvalidDates || hasInvalidDiscounts}
+          disabled={!company.trim() || hasInvalidDates}
           onClick={() =>
             onSave({
               categoryId: catId,
@@ -686,7 +672,7 @@ function PartnerBonusModal({
               offers: offers.map((offer, index) => ({
                 ...(offer.id ? { id: offer.id } : {}),
                 isPublished: offer.isPublished,
-                discountPercent: Number(offer.discountPercent),
+                discountPercent: offer.discountPercent,
                 description: offer.description.trim(),
                 startDate: offer.startDate || null,
                 endDate: offer.endDate || null,
