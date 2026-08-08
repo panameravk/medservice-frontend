@@ -30,8 +30,6 @@ const labelCls = "mb-2 block text-[13px] font-medium text-[#222222]";
 const yellowBtn =
   "rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50";
 
-const DISCOUNT_OPTIONS = Array.from({ length: 20 }, (_, i) => (i + 1) * 5);
-
 // Major RU cities for the header dropdown; the branch's own city is folded in.
 const BASE_CITIES = [
   "Москва",
@@ -342,11 +340,17 @@ function BonusModal({
   onClose: () => void;
   onSave: (payload: BonusModalPayload) => void;
 }) {
-  const [discount, setDiscount] = useState(initial?.discountPercent ?? 20);
+  const [discount, setDiscount] = useState(String(initial?.discountPercent ?? 20));
   const [description, setDescription] = useState(initial?.description ?? "");
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate] = useState(initial?.endDate ?? "");
   const [promo, setPromo] = useState(initial?.promoCode ?? "");
+  const discountValue = Number(discount);
+  const isDiscountValid =
+    discount !== "" &&
+    Number.isInteger(discountValue) &&
+    discountValue >= 1 &&
+    discountValue <= 100;
 
   return (
     <AdminModal onClose={onClose} widthClassName="max-w-[440px]" title={title}>
@@ -354,15 +358,22 @@ function BonusModal({
         <div>
           <label className={labelCls}>Размер скидки (%)</label>
           <div className="w-[140px]">
-            <CustomSelect
-              value={String(discount)}
-              options={DISCOUNT_OPTIONS.map((d) => ({
-                label: `${d}%`,
-                value: String(d),
-              }))}
-              onChange={(value) => setDiscount(Number(value))}
+            <input
+              type="number"
+              min={1}
+              max={100}
+              step={1}
+              inputMode="numeric"
+              value={discount}
+              onChange={(event) => setDiscount(event.target.value)}
+              className={inputCls}
             />
           </div>
+          {!isDiscountValid && (
+            <p className="mt-1.5 text-[12px] text-red-600">
+              Введите целое число от 1 до 100.
+            </p>
+          )}
         </div>
 
         <div>
@@ -409,9 +420,10 @@ function BonusModal({
 
         <button
           type="button"
+          disabled={!isDiscountValid}
           onClick={() =>
             onSave({
-              discountPercent: discount,
+              discountPercent: discountValue,
               description: description.trim(),
               startDate: startDate || null,
               endDate: endDate || null,
