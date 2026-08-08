@@ -24,7 +24,7 @@ export interface DashboardData {
     platform: string;
     label: string;
     enabled: boolean;
-    rating: number;
+    rating: number | null;
     reviews: number;
     totalReviews: number;
     totalNegative: number;
@@ -35,8 +35,18 @@ export interface DashboardData {
     count: number;
     percent: number;
   }>;
-  npsSmall: Array<{ index: number; nps: number }>;
-  npsLarge: Array<{ index: number; nps: number }>;
+  npsSmall: Array<{
+    index: number;
+    nps: number;
+    bucketStart: string;
+    bucketEnd: string;
+  }>;
+  npsLarge: Array<{
+    index: number;
+    nps: number;
+    bucketStart: string;
+    bucketEnd: string;
+  }>;
   employees: Array<{
     name: string;
     ratingsCount: number;

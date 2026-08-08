@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- Branch changes intentionally reset and reload paginated data. */
+
 import { useEffect, useState } from "react";
 import {
   ApiError,
@@ -9,6 +11,8 @@ import {
 } from "../../../lib/api";
 import { useBranchesStore } from "../../../lib/branchesStore";
 
+const PAGE_SIZE = 20;
+
 function ComplaintSkeleton() {
   return (
     <div className="px-6 py-5">
@@ -16,7 +20,6 @@ function ComplaintSkeleton() {
         <div className="h-4 w-44 rounded bg-black/5" />
         <div className="h-5 w-20 rounded-[6px] bg-black/5" />
       </div>
-
       <div className="mt-2 h-3 w-28 rounded bg-black/5" />
       <div className="mt-3 h-3 w-[92%] rounded bg-black/5" />
       <div className="mt-2 h-3 w-[76%] rounded bg-black/5" />
@@ -29,7 +32,7 @@ function StatusBadge({ resolved }: { resolved: boolean }) {
   return (
     <span
       className={[
-        "inline-flex h-6 items-center justify-center rounded-[6px] px-2.5 text-[11px] font-medium",
+        "inline-flex h-6 shrink-0 items-center justify-center rounded-[6px] px-2.5 text-[11px] font-medium",
         resolved
           ? "bg-[#DCFCE7] text-[#15803D]"
           : "bg-[#FEE2E2] text-[#DC2626]",
@@ -40,7 +43,8 @@ function StatusBadge({ resolved }: { resolved: boolean }) {
   );
 }
 
-function formatComplaintDate(value: string) {
+function formatDate(value: string | null) {
+  if (!value) return "—";
   return new Date(value).toLocaleDateString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
@@ -48,47 +52,72 @@ function formatComplaintDate(value: string) {
   });
 }
 
+async function fetchAllPages<T>(
+  fetcher: (offset: number) => Promise<{ items: T[]; total: number }>
+): Promise<T[]> {
+  const first = await fetcher(0);
+  if (first.total <= first.items.length) return first.items;
+
+  const remaining = Math.ceil((first.total - first.items.length) / 500);
+  const rest = await Promise.all(
+    Array.from({ length: remaining }, (_, i) =>
+      fetcher((i + 1) * 500).then((r) => r.items)
+    )
+  );
+  return [...first.items, ...rest.flat()];
+}
+
 export default function InterceptedComplaintsPage() {
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
 
+  // Только жалобы, оставленные пациентом через мини-приложение (clinic) —
+  // негатив «директору». Спарсенные негативные отзывы с площадок сюда НЕ
+  // попадают: они видны в «Опубликованных отзывах» и в аналитике.
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (!selectedBranchId) {
       setComplaints([]);
       setError(null);
       setLoading(false);
+      setPage(1);
       return;
     }
 
     let cancelled = false;
 
-    const loadComplaints = async () => {
+    const load = async () => {
       try {
         setLoading(true);
         setError(null);
         setActionError(null);
+        setPage(1);
 
-        const response = await getComplaints({ branchId: selectedBranchId });
+        const list = await fetchAllPages<Complaint>((offset) =>
+          getComplaints({ branchId: selectedBranchId, limit: 500, offset }).then(
+            (r) => ({ items: r.complaints, total: r.total })
+          )
+        );
 
         if (cancelled) return;
-        setComplaints(response.complaints);
+
+        list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        setComplaints(list);
       } catch {
         if (cancelled) return;
         setComplaints([]);
-        setError("Не удалось загрузить жалобы");
+        setError("Не удалось загрузить данные");
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     };
 
-    void loadComplaints();
+    void load();
 
     return () => {
       cancelled = true;
@@ -104,8 +133,8 @@ export default function InterceptedComplaintsPage() {
       setComplaints((prev) =>
         prev.map((item) => (item.id === id ? updated : item))
       );
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 403) {
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
         setActionError("У вас недостаточно прав для изменения статуса жалобы");
       } else {
         setActionError("Не удалось обновить статус жалобы");
@@ -123,6 +152,9 @@ export default function InterceptedComplaintsPage() {
     );
   }
 
+  const totalPages = Math.ceil(complaints.length / PAGE_SIZE);
+  const pageItems = complaints.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <div className="min-h-[420px]">
       {actionError && (
@@ -133,59 +165,122 @@ export default function InterceptedComplaintsPage() {
 
       {loading ? (
         <div className="divide-y divide-[#EEF2F7]">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <ComplaintSkeleton key={index} />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <ComplaintSkeleton key={i} />
           ))}
         </div>
       ) : error ? (
         <div className="px-6 py-8 text-[13px] text-[#DC2626]">{error}</div>
       ) : complaints.length === 0 ? (
         <div className="px-6 py-8 text-[13px] text-[#9CA3AF]">
-          Перехваченных жалоб нет
+          Нет жалоб
         </div>
       ) : (
-        <div className="divide-y divide-[#EEF2F7]">
-          {complaints.map((complaint) => {
-            const displayName =
-              complaint.clientName || complaint.clientPhone || "Без имени";
-            const isUpdating = updatingId === complaint.id;
+        <>
+          <div className="divide-y divide-[#EEF2F7]">
+            {pageItems.map((complaint) => {
+              const displayName = complaint.clientName || "Без имени";
+              const isUpdating = updatingId === complaint.id;
 
-            return (
-              <div key={complaint.id} className="px-6 py-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="text-[14px] font-semibold leading-5 text-[#111827]">
-                      {displayName}
+              return (
+                <div key={`c-${complaint.id}`} className="px-6 py-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-semibold leading-5 text-[#111827]">
+                        {displayName}
+                      </div>
+                      <div className="mt-1 text-[12px] leading-4 text-[#9CA3AF]">
+                        {formatDate(complaint.createdAt)}
+                        {complaint.clientPhone ? ` · ${complaint.clientPhone}` : ""}
+                        {complaint.branchName ? ` · ${complaint.branchName}` : ""}
+                        {complaint.rating ? ` · ★ ${complaint.rating}` : ""}
+                      </div>
                     </div>
-
-                    <div className="mt-1 text-[12px] leading-4 text-[#9CA3AF]">
-                      {formatComplaintDate(complaint.createdAt)}
-                      {complaint.branchName ? ` · ${complaint.branchName}` : ""}
-                      {complaint.rating ? ` · ★ ${complaint.rating}` : ""}
-                    </div>
+                    <StatusBadge resolved={complaint.resolved} />
                   </div>
 
-                  <StatusBadge resolved={complaint.resolved} />
+                  <p className="mt-3 whitespace-pre-line text-[13px] leading-[20px] text-[#374151]">
+                    {complaint.text}
+                  </p>
+
+                  {!complaint.resolved && (
+                    <button
+                      type="button"
+                      onClick={() => handleResolve(complaint.id, true)}
+                      disabled={isUpdating}
+                      className="mt-4 inline-flex h-9 items-center justify-center rounded-[8px] border border-[#E5E7EB] px-3.5 text-[12px] font-medium text-[#6B7280] transition hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isUpdating ? "Сохранение..." : "Отметить решённой"}
+                    </button>
+                  )}
                 </div>
+              );
+            })}
+          </div>
 
-                <p className="mt-3 whitespace-pre-line text-[13px] leading-[20px] text-[#374151]">
-                  {complaint.text}
-                </p>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-[#EEF2F7] px-6 py-4">
+              <span className="text-[12px] text-[#9CA3AF]">
+                {complaints.length} записей · страница {page} из {totalPages}
+              </span>
 
-                {!complaint.resolved && (
-                  <button
-                    type="button"
-                    onClick={() => handleResolve(complaint.id, true)}
-                    disabled={isUpdating}
-                    className="mt-4 inline-flex h-9 items-center justify-center rounded-[8px] border border-[#E5E7EB] px-3.5 text-[12px] font-medium text-[#6B7280] transition hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isUpdating ? "Сохранение..." : "Отметить решённой"}
-                  </button>
-                )}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] border border-[#E5E7EB] text-[13px] text-[#6B7280] transition hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ‹
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(
+                    (p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2
+                  )
+                  .reduce<(number | "…")[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && p - (arr[idx - 1] as number) > 1)
+                      acc.push("…");
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, idx) =>
+                    p === "…" ? (
+                      <span
+                        key={`ellipsis-${idx}`}
+                        className="inline-flex h-8 w-8 items-center justify-center text-[13px] text-[#9CA3AF]"
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPage(p as number)}
+                        className={[
+                          "inline-flex h-8 w-8 items-center justify-center rounded-[6px] border text-[13px] font-medium transition",
+                          page === p
+                            ? "border-[#111827] bg-[#111827] text-white"
+                            : "border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6]",
+                        ].join(" ")}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] border border-[#E5E7EB] text-[13px] text-[#6B7280] transition hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ›
+                </button>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

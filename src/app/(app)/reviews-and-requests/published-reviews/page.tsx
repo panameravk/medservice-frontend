@@ -1,18 +1,37 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- Branch and filter changes intentionally reset paginated data. */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBranchesStore } from "../../../lib/branchesStore";
 import { getReviews, type Review } from "../../../lib/api";
 
 const PLATFORMS = [
-  { label: "Яндекс.Карты", value: "yandex_maps" },
-  { label: "Google Maps", value: "google_maps" },
-  { label: "2GIS", value: "2gis" },
-  { label: "ПроДокторов", value: "prodoctorov" },
-  { label: "НаПоправку", value: "napopravku" },
+  { label: "Яндекс.Карты", value: "yandex_maps", icon: "/Icons/platforms/yandex-maps-logo.svg" },
+  { label: "Google Maps", value: "google_maps", icon: "/Icons/platforms/google-maps-sign-logo.svg" },
+  { label: "2Gis", value: "2gis", icon: "/Icons/platforms/2gis-icon-logo.svg" },
+  { label: "ПроДокторов", value: "prodoctorov", icon: "/Icons/platforms/prodoktorov.svg" },
+  { label: "НаПоправку", value: "napopravku", icon: "/Icons/platforms/napopravku.svg" },
 ];
 
 const RATINGS = [1, 2, 3, 4, 5];
+
+const PAGE_SIZE = 20;
+
+async function fetchAllPages<T>(
+  fetcher: (offset: number) => Promise<{ items: T[]; total: number }>
+): Promise<T[]> {
+  const first = await fetcher(0);
+  if (first.total <= first.items.length) return first.items;
+
+  const remaining = Math.ceil((first.total - first.items.length) / 500);
+  const rest = await Promise.all(
+    Array.from({ length: remaining }, (_, i) =>
+      fetcher((i + 1) * 500).then((r) => r.items)
+    )
+  );
+  return [...first.items, ...rest.flat()];
+}
 
 function Stars({ rating }: { rating: number }) {
   return (
@@ -55,6 +74,7 @@ export default function PublishedReviewsPage() {
   const [allReviews, setAllReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const [ratingFilter, setRatingFilter] = useState<number[]>([]);
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
@@ -76,6 +96,7 @@ export default function PublishedReviewsPage() {
       setAllReviews([]);
       setError(null);
       setLoading(false);
+      setPage(1);
       return;
     }
 
@@ -85,14 +106,26 @@ export default function PublishedReviewsPage() {
       try {
         setError(null);
         setLoading(true);
+        setPage(1);
 
-        const response = await getReviews({
-          branchId: selectedBranchId,
-          ...(platformFilter ? { platform: platformFilter } : {}),
-        });
+        const hasRating = ratingFilter.length > 0;
+        const reviews = await fetchAllPages<Review>((offset) =>
+          getReviews({
+            branchId: selectedBranchId,
+            ...(platformFilter ? { platform: platformFilter } : {}),
+            ...(hasRating
+              ? {
+                  ratingMin: Math.min(...ratingFilter),
+                  ratingMax: Math.max(...ratingFilter),
+                }
+              : {}),
+            limit: 500,
+            offset,
+          }).then((r) => ({ items: r.reviews, total: r.total }))
+        );
 
         if (cancelled) return;
-        setAllReviews(response.reviews);
+        setAllReviews(reviews);
       } catch {
         if (cancelled) return;
         // Не очищаем список при смене фильтра — так контейнер/строки не "прыгают"
@@ -109,12 +142,24 @@ export default function PublishedReviewsPage() {
     return () => {
       cancelled = true;
     };
-  }, [platformFilter, selectedBranchId]);
+  }, [platformFilter, ratingFilter, selectedBranchId]);
 
+  // Бэк фильтрует по диапазону [min..max], а конкретный набор (например, {2,5})
+  // дофильтровывается здесь — так отсекаются "дыры" внутри диапазона.
   const filteredReviews = useMemo(() => {
     if (ratingFilter.length === 0) return allReviews;
     return allReviews.filter((review) => ratingFilter.includes(review.rating));
   }, [allReviews, ratingFilter]);
+
+  const totalPages = Math.ceil(filteredReviews.length / PAGE_SIZE);
+  const pageItems = filteredReviews.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE
+  );
+
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(1);
+  }, [page, totalPages]);
 
   if (!selectedBranchId) {
     return (
@@ -170,12 +215,14 @@ export default function PublishedReviewsPage() {
                   type="button"
                   onClick={() => togglePlatform(platform.value)}
                   className={[
-                    "inline-flex h-7 items-center rounded-[6px] border px-2.5 text-[12px] font-medium transition",
+                    "inline-flex h-7 items-center gap-1.5 rounded-[6px] border px-2.5 text-[12px] font-medium transition",
                     active
                       ? "border-[#111827] bg-[#111827] text-white"
                       : "border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6]",
                   ].join(" ")}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={platform.icon} alt="" className="h-[14px] w-[14px] shrink-0" />
                   {platform.label}
                 </button>
               );
@@ -203,38 +250,102 @@ export default function PublishedReviewsPage() {
           )}
 
           <div className="divide-y divide-[#EEF2F7]">
-            {filteredReviews.map((review) => {
+            {pageItems.map((review) => {
               const platformLabel =
                 PLATFORMS.find((platform) => platform.value === review.platform)
                   ?.label ?? review.platform;
 
               return (
                 <div key={review.id} className="px-6 py-5">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                     <span className="text-[14px] font-semibold leading-5 text-[#111827]">
                       {review.reviewerName || "Аноним"}
-                    </span>
-
-                    <span className="rounded-[6px] bg-[#F3F4F6] px-2 py-1 text-[11px] leading-none text-[#6B7280]">
-                      {platformLabel}
                     </span>
 
                     <span className="text-[12px] text-[#9CA3AF]">
                       {formatPublishedDate(review.publishedAt)}
                     </span>
 
-                    <div className="ml-auto">
-                      <Stars rating={review.rating} />
-                    </div>
+                    <span className="text-[12px] text-[#6B7280]">
+                      {platformLabel}
+                    </span>
+
+                    <Stars rating={review.rating} />
                   </div>
 
-                  <p className="mt-3 whitespace-pre-line text-[13px] leading-[20px] text-[#374151]">
+                  <p className="mt-2.5 whitespace-pre-line text-[13px] leading-[20px] text-[#374151]">
                     {review.text || "Без текста"}
                   </p>
                 </div>
               );
             })}
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-[#EEF2F7] px-6 py-4">
+              <span className="text-[12px] text-[#9CA3AF]">
+                {filteredReviews.length} записей · страница {page} из {totalPages}
+              </span>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] border border-[#E5E7EB] text-[13px] text-[#6B7280] transition hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ‹
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(
+                    (p) =>
+                      p === 1 ||
+                      p === totalPages ||
+                      Math.abs(p - page) <= 2
+                  )
+                  .reduce<(number | "…")[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && p - (arr[idx - 1] as number) > 1)
+                      acc.push("…");
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, idx) =>
+                    p === "…" ? (
+                      <span
+                        key={`ellipsis-${idx}`}
+                        className="inline-flex h-8 w-8 items-center justify-center text-[13px] text-[#9CA3AF]"
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPage(p as number)}
+                        className={[
+                          "inline-flex h-8 w-8 items-center justify-center rounded-[6px] border text-[13px] font-medium transition",
+                          page === p
+                            ? "border-[#111827] bg-[#111827] text-white"
+                            : "border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6]",
+                        ].join(" ")}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] border border-[#E5E7EB] text-[13px] text-[#6B7280] transition hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

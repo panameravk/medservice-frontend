@@ -29,10 +29,10 @@ export default function LoginPage() {
       }
 
       try {
-        await authApi.me();
+        const me = await authApi.me();
 
         if (cancelled) return;
-        router.replace("/branches");
+        router.replace(me.isSuperuser ? "/admin/branches" : "/branches");
       } catch {
         if (cancelled) return;
 
@@ -56,8 +56,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await authApi.login(username.trim(), password);
-      router.replace("/branches");
+      const data = await authApi.login(username.trim(), password);
+      router.replace(data.user.isSuperuser ? "/admin/branches" : "/branches");
     } catch (error: unknown) {
       if (error instanceof ApiError) {
         setError(error.message);

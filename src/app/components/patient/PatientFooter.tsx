@@ -1,3 +1,5 @@
+import { LEGAL_LINKS } from "../../lib/legal";
+
 export default function PatientFooter() {
   return (
     <footer className="mt-auto bg-white px-[14px] pb-[8px] pt-[7px]">
@@ -14,13 +16,23 @@ export default function PatientFooter() {
           </div>
 
           <div className="mt-[4px] flex justify-center gap-[18px] text-[7px] leading-none text-[#6F6F6F]">
-            <span className="border-b border-dotted border-[#6F6F6F]">
-              Публичная оферта
-            </span>
+            <a
+              href={LEGAL_LINKS.userAgreement.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border-b border-dotted border-[#6F6F6F]"
+            >
+              {LEGAL_LINKS.userAgreement.label}
+            </a>
 
-            <span className="border-b border-dotted border-[#6F6F6F]">
-              Политика конфиденциальности
-            </span>
+            <a
+              href={LEGAL_LINKS.cookiePolicy.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border-b border-dotted border-[#6F6F6F]"
+            >
+              {LEGAL_LINKS.cookiePolicy.label}
+            </a>
           </div>
         </div>
       </div>

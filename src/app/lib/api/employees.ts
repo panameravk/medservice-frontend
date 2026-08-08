@@ -6,7 +6,15 @@ export interface Employee {
   name: string;
   active: boolean;
   profiles: string[];
+  profilePlatforms: string[];
 }
+
+type EmployeeWritePayload = {
+  name: string;
+  active: boolean;
+  profiles: string[];
+  profilePlatforms: string[];
+};
 
 export const employeesApi = {
   getAll: (branchId: string): Promise<Employee[]> =>
@@ -14,7 +22,7 @@ export const employeesApi = {
 
   create: (
     branchId: string,
-    data: { name: string; active: boolean; profiles: string[] }
+    data: EmployeeWritePayload
   ): Promise<Employee> =>
     apiFetch(`/employees${buildQuery({ branch_id: branchId })}`, {
       method: "POST",
@@ -23,7 +31,7 @@ export const employeesApi = {
 
   update: (
     id: number,
-    data: Partial<{ name: string; active: boolean; profiles: string[] }>
+    data: Partial<EmployeeWritePayload>
   ): Promise<Employee> =>
     apiFetch(`/employees/${id}`, {
       method: "PATCH",

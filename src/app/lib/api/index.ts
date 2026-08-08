@@ -7,3 +7,5 @@ export * from "./complaints";
 export * from "./requests";
 export * from "./employees";
 export * from "./blacklist";
+export * from "./bonuses";
+export * from "./branchAccess";

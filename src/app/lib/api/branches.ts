@@ -1,18 +1,33 @@
 import { apiFetch } from "./client";
 
+export interface BranchFirstUser {
+  id: number;
+  username: string;
+  email: string;
+  phone: string | null;
+  role: string | null;
+}
+
 export interface Branch {
   id: string;
   name: string;
   address: string | null;
   city: string | null;
   phone: string | null;
+  logoUrl: string | null;
   timezone: string;
   specialization: string;
   requestFrequencyDays: number;
   complaintEmails: string[];
   reminderEmails: string[];
+  platformUrls: Record<string, string>;
+  platformEnabled: Record<string, boolean>;
+  smsEnabled: boolean;
+  smsTemplate: string | null;
+  smsMonthlyLimit: number | null;
   avgRating: number;
   npsScore: number;
+  firstUser: BranchFirstUser | null;
 }
 
 type BranchDto = {
@@ -21,13 +36,20 @@ type BranchDto = {
   address: string | null;
   city: string | null;
   phone: string | null;
+  logoUrl: string | null;
   timezone: string;
   specialization: string;
   requestFrequencyDays: number;
   complaintEmails: string[];
   reminderEmails: string[];
+  platformUrls: Record<string, string>;
+  platformEnabled: Record<string, boolean>;
+  smsEnabled: boolean;
+  smsTemplate: string | null;
+  smsMonthlyLimit: number | null;
   avgRating: number;
   npsScore: number;
+  firstUser?: BranchFirstUser | null;
 };
 
 type BranchUpdatePayload = Partial<{
@@ -40,12 +62,18 @@ type BranchUpdatePayload = Partial<{
   requestFrequencyDays: number;
   complaintEmails: string[];
   reminderEmails: string[];
+  platformUrls: Record<string, string>;
+  platformEnabled: Record<string, boolean>;
+  smsEnabled: boolean;
+  smsTemplate: string | null;
+  smsMonthlyLimit: number | null;
 }>;
 
 function mapBranchDto(branch: BranchDto): Branch {
   return {
     ...branch,
     id: String(branch.id),
+    firstUser: branch.firstUser ?? null,
   };
 }
 
@@ -67,6 +95,11 @@ function toBranchUpdateDto(data: BranchUpdatePayload) {
   if ("reminderEmails" in data) {
     dto.reminder_emails = data.reminderEmails;
   }
+  if ("platformUrls" in data) dto.platform_urls = data.platformUrls;
+  if ("platformEnabled" in data) dto.platform_enabled = data.platformEnabled;
+  if ("smsEnabled" in data) dto.sms_enabled = data.smsEnabled;
+  if ("smsTemplate" in data) dto.sms_template = data.smsTemplate;
+  if ("smsMonthlyLimit" in data) dto.sms_monthly_limit = data.smsMonthlyLimit;
 
   return dto;
 }
@@ -87,6 +120,29 @@ export async function updateBranch(
   const response = await apiFetch<BranchDto>(`/branches/${branchId}`, {
     method: "PATCH",
     body: toBranchUpdateDto(data),
+  });
+
+  return mapBranchDto(response);
+}
+
+/**
+ * Patient-facing storefront fields (name / city / logo) — a separate, narrower
+ * endpoint than updateBranch so a branch manager (not just a superuser) can edit
+ * what the patient sees in the mini without touching billing/settings fields.
+ * logoUrl is a base64 data URL (PNG) or null to clear it.
+ */
+export async function updateBranchIdentity(
+  branchId: string,
+  data: { name?: string; city?: string | null; logoUrl?: string | null }
+): Promise<Branch> {
+  const dto: Record<string, unknown> = {};
+  if ("name" in data) dto.name = data.name;
+  if ("city" in data) dto.city = data.city;
+  if ("logoUrl" in data) dto.logo_url = data.logoUrl;
+
+  const response = await apiFetch<BranchDto>(`/branches/${branchId}/identity`, {
+    method: "PATCH",
+    body: dto,
   });
 
   return mapBranchDto(response);

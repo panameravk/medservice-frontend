@@ -27,44 +27,39 @@ export default function ReviewsAndRequestsLayout({
   const pathname = usePathname();
 
   return (
-    <div className="space-y-4">
-      <div>
+    <div>
+      <div className="mb-5">
         <h1 className="text-[24px] font-bold leading-7 text-[#111827]">
           Отзывы и запросы
         </h1>
         <p className="mt-1 text-[13px] text-[#6B7280]">
           Все отзывы, их статус и история
         </p>
-
-        <div className="mt-4">
-          <div className="flex items-center">
-            {tabs.map((tab) => {
-              const active = pathname === tab.href;
-
-              return (
-                <Link
-                  key={tab.href}
-                  href={tab.href}
-                  className={[
-                    "flex h-10 items-center justify-center px-5",
-                    "border border-[#E5E7EB]",
-                    "text-[13px] font-medium",
-                    "first:ml-0 first:rounded-l-[12px] last:rounded-r-[12px]",
-                    "-ml-[1px]",
-                    active
-                      ? "bg-white text-[#111827]"
-                      : "bg-[#F3F4F6] text-[#6B7280] hover:bg-[#ECEFF3]",
-                  ].join(" ")}
-                >
-                  {tab.label}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
-      <div className="min-h-[520px] rounded-[12px] border border-[#E5E7EB] bg-white">
+      <div className="relative z-10 -mb-px inline-flex w-fit overflow-hidden rounded-t-[12px] border border-b-0 border-[#E6E6E6]">
+        {tabs.map((tab, index) => {
+          const active = pathname === tab.href;
+
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={[
+                "flex h-[52px] items-center justify-center px-8 text-center text-[14px] leading-[18px] transition",
+                index !== tabs.length - 1 ? "border-r border-[#E6E6E6]" : "",
+                active
+                  ? "bg-white font-medium text-[#222222]"
+                  : "border-b border-[#E6E6E6] bg-[#F7F7F7] font-normal text-[#3D3D3D] hover:bg-[#F2F2F2]",
+              ].join(" ")}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="min-h-[520px] rounded-b-[14px] rounded-tr-[14px] border border-[#E6E6E6] bg-white">
         {children}
       </div>
     </div>

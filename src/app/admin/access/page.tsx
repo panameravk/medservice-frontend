@@ -2,16 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { AdminModal } from "../../components/admin/AdminModal";
-import { AdminSelect } from "../../components/admin/AdminSelect";
 import { AdminShellCard } from "../../components/admin/AdminShellCard";
+import { getCanonicalPhone, PhoneInput } from "../../components/PhoneInput";
 import { adminAccessApi } from "../../lib/admin/api";
 import type { AdminAccessUser } from "../../types/admin";
-
-const ROLE_OPTIONS = [
-  { label: "Руководитель", value: "Руководитель" },
-  { label: "Тех. поддержка", value: "Тех. поддержка" },
-  { label: "Менеджер по продажам", value: "Менеджер по продажам" },
-];
 
 function EditIcon() {
   return (
@@ -65,36 +59,55 @@ export default function AdminAccessPage() {
   const [items, setItems] = useState<AdminAccessUser[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<AdminAccessUser | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void adminAccessApi.getAll().then(setItems);
   }, []);
 
+  // На странице доступов показываем только администраторов.
+  const admins = items.filter((item) => item.isSuperuser);
+
   const onDelete = async (id: number) => {
-    await adminAccessApi.delete(id);
-    setItems((prev) => prev.filter((item) => item.id !== id));
+    try {
+      await adminAccessApi.delete(id);
+      setItems((prev) => prev.filter((item) => item.id !== id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка при удалении");
+    }
   };
 
   const onSave = async (
-    payload: Omit<AdminAccessUser, "id"> & { id?: number }
+    payload: Omit<AdminAccessUser, "id"> & { id?: number; password?: string }
   ) => {
-    if (payload.id) {
-      const updated = await adminAccessApi.update(payload.id, payload);
-      setItems((prev) =>
-        prev.map((item) => (item.id === payload.id ? updated : item))
-      );
-    } else {
-      const created = await adminAccessApi.create({
-        fullName: payload.fullName,
-        role: payload.role,
-        email: payload.email,
-        phone: payload.phone,
-      });
-      setItems((prev) => [...prev, created]);
+    setError(null);
+    try {
+      if (payload.id) {
+        const updated = await adminAccessApi.update(payload.id, {
+          fullName: payload.fullName,
+          role: payload.role,
+          email: payload.email,
+          phone: payload.phone,
+        });
+        setItems((prev) =>
+          prev.map((item) => (item.id === payload.id ? updated : item))
+        );
+      } else {
+        const created = await adminAccessApi.create({
+          fullName: payload.fullName,
+          username: payload.username,
+          password: payload.password ?? "",
+          role: payload.role,
+          email: payload.email,
+          phone: payload.phone,
+        });
+        setItems((prev) => [...prev, created]);
+      }
+      setOpen(false);
+      setEditing(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка при сохранении");
     }
-
-    setOpen(false);
-    setEditing(null);
   };
 
   return (
@@ -104,13 +117,19 @@ export default function AdminAccessPage() {
           Доступы
         </h1>
         <p className="mt-1 text-[14px] leading-[18px] text-[#6E6E73]">
-          Пользователи с доступом к администраторской панели
+          Администраторы с полным доступом ко всем филиалам
         </p>
       </div>
 
+      {error && (
+        <div className="mb-4 rounded-[10px] bg-red-50 px-4 py-3 text-[14px] text-red-600">
+          {error}
+        </div>
+      )}
+
       <AdminShellCard>
-        <div className="grid grid-cols-[1.45fr_1.1fr_0.9fr_0.9fr_70px] items-center text-[13px] font-medium text-[#222222]">
-          <div>ФИО</div>
+        <div className="grid grid-cols-[1.45fr_1fr_0.9fr_0.9fr_100px] items-center text-[13px] font-medium text-[#222222]">
+          <div>ФИО / Логин</div>
           <div>Роль в команде</div>
           <div>Email</div>
           <div>Телефон</div>
@@ -118,15 +137,18 @@ export default function AdminAccessPage() {
         </div>
 
         <div className="mt-5 space-y-7">
-          {items.map((item) => (
+          {admins.map((item) => (
             <div
               key={item.id}
-              className="grid grid-cols-[1.45fr_1.1fr_0.9fr_0.9fr_70px] items-center text-[16px] text-[#3A3A46]"
+              className="grid grid-cols-[1.45fr_1fr_0.9fr_0.9fr_100px] items-center text-[16px] text-[#3A3A46]"
             >
-              <div>{item.fullName}</div>
-              <div>{item.role}</div>
+              <div>
+                <div>{item.fullName ?? "—"}</div>
+                <div className="text-[13px] text-[#A3A3A3]">@{item.username}</div>
+              </div>
+              <div>{item.role ?? "—"}</div>
               <div>{item.email}</div>
-              <div>{item.phone}</div>
+              <div>{item.phone ?? "—"}</div>
               <div className="flex items-center justify-end gap-3 text-[#A3A3A3]">
                 <button
                   type="button"
@@ -160,7 +182,7 @@ export default function AdminAccessPage() {
           }}
           className="mt-10 flex h-[48px] w-[308px] items-center justify-center rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95"
         >
-          Выдать доступ к филиалу
+          Добавить администратора
         </button>
       </AdminShellCard>
 
@@ -170,6 +192,7 @@ export default function AdminAccessPage() {
           onClose={() => {
             setOpen(false);
             setEditing(null);
+            setError(null);
           }}
           onSave={onSave}
         />
@@ -185,14 +208,20 @@ function AccessModal({
 }: {
   initial: AdminAccessUser | null;
   onClose: () => void;
-  onSave: (payload: Omit<AdminAccessUser, "id"> & { id?: number }) => void;
+  onSave: (
+    payload: Omit<AdminAccessUser, "id"> & { id?: number; password?: string }
+  ) => void;
 }) {
-  const [fullName, setFullName] = useState(
-    initial?.fullName ?? "Мавриди Анатоли Дмитриевна"
-  );
-  const [role, setRole] = useState(initial?.role ?? ROLE_OPTIONS[0].value);
+  const [fullName, setFullName] = useState(initial?.fullName ?? "");
+  const [username, setUsername] = useState(initial?.username ?? "");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState(initial?.role ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
+
+  const isEditing = !!initial;
+  const phoneCanonical = getCanonicalPhone(phone);
+  const phoneInvalid = !!phone.trim() && !phoneCanonical;
 
   return (
     <AdminModal onClose={onClose}>
@@ -208,11 +237,42 @@ function AccessModal({
           />
         </div>
 
+        {!isEditing && (
+          <div>
+            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+              Логин
+            </label>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none"
+            />
+          </div>
+        )}
+
+        {!isEditing && (
+          <div>
+            <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+              Пароль
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none"
+            />
+          </div>
+        )}
+
         <div>
           <label className="mb-2 block text-[13px] font-medium text-[#222222]">
             Роль в команде
           </label>
-          <AdminSelect value={role} options={ROLE_OPTIONS} onChange={setRole} />
+          <input
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none"
+          />
         </div>
 
         <div>
@@ -230,11 +290,19 @@ function AccessModal({
           <label className="mb-2 block text-[13px] font-medium text-[#222222]">
             Телефон
           </label>
-          <input
+          <PhoneInput
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="h-[46px] w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[14px] text-[#222222] outline-none"
+            onChange={(next, meta) => setPhone(meta.canonical ?? next)}
           />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-[13px] font-medium text-[#222222]">
+            Доступ к филиалам
+          </label>
+          <p className="text-[13px] text-[#6E6E73]">
+            Администратор видит все филиалы.
+          </p>
         </div>
 
         <button
@@ -242,15 +310,20 @@ function AccessModal({
           onClick={() =>
             onSave({
               id: initial?.id,
-              fullName: fullName.trim(),
-              role,
+              fullName: fullName.trim() || null,
+              username: username.trim(),
+              password: password,
+              role: role.trim() || null,
               email: email.trim(),
-              phone: phone.trim(),
+              phone: phoneCanonical,
+              isSuperuser: true,
+              branchIds: [],
             })
           }
-          className="mt-2 h-[48px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95"
+          disabled={phoneInvalid}
+          className="mt-2 h-[48px] w-full rounded-[10px] bg-[#F4C21A] text-[14px] font-semibold text-[#111827] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Выдать доступ
+          {isEditing ? "Сохранить изменения" : "Создать администратора"}
         </button>
       </div>
     </AdminModal>

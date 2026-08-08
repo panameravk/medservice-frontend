@@ -13,11 +13,19 @@ export default function ForgotPasswordPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    const normalizedEmail = email.trim();
     setError(null);
+
+    if (!normalizedEmail) {
+      setError("Введите email.");
+      setState("error");
+      return;
+    }
+
     setState("loading");
 
     try {
-      await authApi.forgotPassword(email.trim());
+      await authApi.forgotPassword(normalizedEmail);
       setState("success");
     } catch (error: unknown) {
       if (error instanceof ApiError) {
@@ -38,8 +46,8 @@ export default function ForgotPasswordPage() {
         {state === "success" ? (
           <div className="rounded-[12px] bg-[#DCFCE7] px-5 py-6">
             <p className="text-center text-[20px] font-medium leading-[30px] text-[#166534]">
-              Если указанный email зарегистрирован, на него отправлена ссылка
-              для восстановления пароля.
+              Если учётная запись с указанным email существует, ссылка для
+              восстановления отправлена.
             </p>
           </div>
         ) : (

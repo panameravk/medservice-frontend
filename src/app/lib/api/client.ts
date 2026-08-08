@@ -4,32 +4,49 @@ export const API_BASE = `${API_URL}/api/v1`;
 type Primitive = string | number | boolean | null | undefined;
 type QueryValue = Primitive | Primitive[];
 
+export type SessionKind = "user" | "admin";
+
+type SessionConfig = {
+  storageKey: string;
+  cookieName: string;
+};
+
+const SESSION_CONFIG: Record<SessionKind, SessionConfig> = {
+  user: { storageKey: "access_token", cookieName: "token" },
+  admin: { storageKey: "admin_access_token", cookieName: "admin_token" },
+};
+
 function isBrowser() {
   return typeof window !== "undefined";
 }
 
-export function getAccessToken(): string | null {
+export function getAccessToken(session: SessionKind = "user"): string | null {
   if (!isBrowser()) return null;
-  return localStorage.getItem("access_token");
+  return localStorage.getItem(SESSION_CONFIG[session].storageKey);
 }
 
-function buildAuthCookie(token: string, maxAgeSeconds = 60 * 60 * 24) {
+function buildAuthCookie(
+  name: string,
+  token: string,
+  maxAgeSeconds = 60 * 60 * 24
+) {
   const secure =
     isBrowser() && window.location.protocol === "https:" ? "; secure" : "";
-  return `token=${token}; path=/; max-age=${maxAgeSeconds}; samesite=lax${secure}`;
+  return `${name}=${token}; path=/; max-age=${maxAgeSeconds}; samesite=lax${secure}`;
 }
 
-export function setTokens(access: string) {
+export function setTokens(access: string, session: SessionKind = "user") {
   if (!isBrowser()) return;
-  localStorage.setItem("access_token", access);
-  document.cookie = buildAuthCookie(access);
+  const { storageKey, cookieName } = SESSION_CONFIG[session];
+  localStorage.setItem(storageKey, access);
+  document.cookie = buildAuthCookie(cookieName, access);
 }
 
-export function clearTokens() {
+export function clearTokens(session: SessionKind = "user") {
   if (!isBrowser()) return;
-  localStorage.removeItem("access_token");
-  document.cookie =
-    "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax";
+  const { storageKey, cookieName } = SESSION_CONFIG[session];
+  localStorage.removeItem(storageKey);
+  document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax`;
 }
 
 type ValidationDetailItem = {
@@ -118,14 +135,15 @@ export function buildQuery(params: Record<string, QueryValue>) {
 export type ApiFetchOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
   auth?: boolean;
+  session?: SessionKind;
 };
 
 export async function apiFetch<T>(
   path: string,
   options: ApiFetchOptions = {}
 ): Promise<T> {
-  const { auth = true, headers, body, ...rest } = options;
-  const token = auth ? getAccessToken() : null;
+  const { auth = true, session = "user", headers, body, ...rest } = options;
+  const token = auth ? getAccessToken(session) : null;
   const url = `${API_BASE}${path}`;
 
   const finalHeaders = new Headers(headers ?? {});
@@ -168,7 +186,7 @@ export async function apiFetch<T>(
   }
 
   if (response.status === 401) {
-    clearTokens();
+    clearTokens(session);
     throw new ApiError(
       extractApiErrorMessage(payload, "Unauthorized"),
       401,

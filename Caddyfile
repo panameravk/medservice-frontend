@@ -1,0 +1,20 @@
+{
+    email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy frontend:3000
+}
+
+# API_DOMAIN здесь НЕ обслуживается: между серверами нет приватной сети,
+# поэтому TLS для API терминирует Caddy на самом бэкенд-сервере, и DNS
+# API-домена указывает туда (см. medservice-backend/Caddyfile).
+
+# Patient mini-app. The mini container serves the SPA (with history fallback);
+# the API base (https://API_DOMAIN) is baked into the bundle at build time.
+# SMS review links (MINI_PUBLIC_URL) point here.
+{$MINI_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy mini:80
+}

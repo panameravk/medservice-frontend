@@ -5,10 +5,8 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useBranchesStore } from "../lib/branchesStore";
-import { getAnalytics } from "../lib/api";
+import { getRequestUsage, type RequestUsage } from "../lib/api";
 import { Brand } from "./Brand";
-
-const MONTHLY_LIMIT = 150;
 
 const nav = [
   {
@@ -22,6 +20,11 @@ const nav = [
     icon: "/Icons/heart_logo.svg",
   },
   {
+    href: "/bonuses",
+    label: "Бонусы",
+    icon: "/Icons/gift_base.svg",
+  },
+  {
     href: "/settings/branch",
     label: "Настройки",
     icon: "/Icons/settings_sidebar.svg",
@@ -32,25 +35,25 @@ export function Sidebar() {
   const pathname = usePathname();
   const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
 
-  const [sent, setSent] = useState<number | null>(null);
+  const [usage, setUsage] = useState<RequestUsage | null>(null);
 
   useEffect(() => {
-    if (!selectedBranchId) {
-      setSent(null);
-      return;
-    }
-
     let cancelled = false;
 
     const loadUsage = async () => {
+      if (!selectedBranchId) {
+        if (!cancelled) setUsage(null);
+        return;
+      }
+
       try {
-        const data = await getAnalytics(selectedBranchId, "30");
+        const data = await getRequestUsage(selectedBranchId);
         if (!cancelled) {
-          setSent(data.sent);
+          setUsage(data);
         }
       } catch {
         if (!cancelled) {
-          setSent(null);
+          setUsage(null);
         }
       }
     };
@@ -70,7 +73,7 @@ export function Sidebar() {
         </div>
 
         <nav className="mt-6 space-y-1">
-          {nav.map((item) => {
+          {nav.map((item, i) => {
             const active =
               item.href === "/settings/branch"
                 ? pathname === "/settings/branch" ||
@@ -82,8 +85,9 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                style={{ animationDelay: `${80 + i * 70}ms` }}
                 className={[
-                  "flex items-center gap-3 rounded-[10px] px-3 py-2 text-[16px] transition",
+                  "animate-item flex items-center gap-3 rounded-[10px] px-3 py-2 text-[16px] transition",
                   active
                     ? "bg-[#F3F4F6] font-bold text-[#111827]"
                     : "font-bold text-[#111827] hover:bg-black/5",
@@ -113,11 +117,15 @@ export function Sidebar() {
 
         <div className="mt-auto px-2 pt-6 text-[11px] leading-4 text-[#6B7280]">
           {selectedBranchId ? (
-            sent !== null ? (
-              <>
-                Отправлено {sent} запросов из {MONTHLY_LIMIT} за последние 30
-                дней
-              </>
+            usage !== null ? (
+              usage.limit > 0 ? (
+                <>
+                  Отправлено {usage.sentThisMonth} из {usage.limit} запросов в
+                  этом месяце
+                </>
+              ) : (
+                <>Отправлено {usage.sentThisMonth} запросов в этом месяце</>
+              )
             ) : (
               "Загрузка..."
             )

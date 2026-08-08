@@ -1,11 +1,18 @@
 "use client";
 
+import Image from "next/image";
 import { AuthGuard } from "../../components/AuthGuard";
+import { ImpersonationBanner } from "../../components/ImpersonationBanner";
+import {
+  useExitImpersonation,
+  useImpersonation,
+} from "../../lib/useImpersonation";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getDateRangeByPeriod, type Period } from "../../lib/date";
 import { Unbounded } from "next/font/google";
 import { useBranchesStore } from "../../lib/branchesStore";
+import { DateRangeControl } from "../../components/DateRangeControl";
 import { UserIcon } from "../../components/ui/icons/UserIcon";
 import {
   authApi,
@@ -13,6 +20,11 @@ import {
   getBranchesAnalytics,
   type BranchAnalyticsRow,
 } from "../../lib/api";
+import { LEGAL_LINKS } from "../../lib/legal";
+import {
+  getCanonicalPhone,
+  PhoneInput,
+} from "../../components/PhoneInput";
 
 const unbounded = Unbounded({
   subsets: ["cyrillic"],
@@ -71,110 +83,31 @@ function SkeletonRow() {
   );
 }
 
-function CalendarIcon({ className = "" }: { className?: string }) {
+function LockIcon({ className = "" }: { className?: string }) {
   return (
     <svg
       className={className}
-      width="16"
-      height="16"
+      width="14"
+      height="14"
       viewBox="0 0 24 24"
       fill="none"
     >
-      <path
-        d="M7 3v3M17 3v3"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M4 8h16"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
       <rect
         x="5"
-        y="5"
+        y="11"
         width="14"
-        height="16"
+        height="9"
         rx="2"
         stroke="currentColor"
         strokeWidth="2"
       />
-    </svg>
-  );
-}
-
-function DateField({
-  value,
-  formatRu,
-  onChange,
-}: {
-  value: string;
-  formatRu: (value: string) => string;
-  onChange: (next: string) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const openCalendar = () => {
-    const input = inputRef.current;
-
-    if (!input) return;
-
-    if (typeof input.showPicker === "function") {
-      input.showPicker();
-    } else {
-      input.click();
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={openCalendar}
-      className="relative flex h-10 w-[150px] items-center justify-between gap-2 rounded-[10px] border border-[#E5E7EB] bg-white px-3 text-[13px] text-[#111827] shadow-[0_1px_0_rgba(0,0,0,0.02)]"
-    >
-      <span className="tabular-nums">{formatRu(value)}</span>
-
-      <svg
-        className="text-[#9CA3AF]"
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-      >
-        <path
-          d="M7 3v3M17 3v3"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <path
-          d="M4 8h16"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <rect
-          x="5"
-          y="5"
-          width="14"
-          height="16"
-          rx="2"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
-      </svg>
-
-      <input
-        ref={inputRef}
-        type="date"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
-        tabIndex={-1}
+      <path
+        d="M8 11V8a4 4 0 1 1 8 0v3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
       />
-    </button>
+    </svg>
   );
 }
 
@@ -190,20 +123,16 @@ export default function BranchesPage() {
   const userBtnRef = useRef<HTMLButtonElement>(null);
   const userPopRef = useRef<HTMLDivElement>(null);
 
+  const impersonation = useImpersonation();
+  const exitImpersonation = useExitImpersonation();
+
   const toISODate = (d: Date) => d.toISOString().slice(0, 10);
 
-  const [activePreset, setActivePreset] = useState<Period>("30");
+  const [activePreset, setActivePreset] = useState<Period | null>("30");
 
   const initialRange = getDateRangeByPeriod("30");
   const [dateFrom, setDateFrom] = useState(() => toISODate(initialRange.start));
   const [dateTo, setDateTo] = useState(() => toISODate(initialRange.end));
-
-  const formatRu = (iso: string) => {
-    if (!iso) return "—";
-    const [y, m, d] = iso.split("-");
-    if (!y || !m || !d) return iso;
-    return `${d}.${m}.${y}`;
-  };
 
   const [rows, setRows] = useState<BranchAnalyticsRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,6 +141,18 @@ export default function BranchesPage() {
 
   const [userName, setUserName] = useState("...");
   const [userEmail, setUserEmail] = useState("");
+  const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  // Роль может менять только суперпользователь — обычный юзер её только видит.
+  const [userIsSuperuser, setUserIsSuperuser] = useState(false);
+
+  // Модалка «Настроить аккаунт» — та же, что в шапке внутри (app).
+  const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
+  const [accName, setAccName] = useState("");
+  const [accPhone, setAccPhone] = useState("");
+  const [accRole, setAccRole] = useState("");
+  const [accSaving, setAccSaving] = useState(false);
+  const [accError, setAccError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -224,6 +165,9 @@ export default function BranchesPage() {
 
         setUserName(user.fullName || user.username);
         setUserEmail(user.email);
+        setUserPhone(user.phone);
+        setUserRole(user.role);
+        setUserIsSuperuser(user.isSuperuser);
       } catch {
         if (cancelled) return;
 
@@ -239,6 +183,43 @@ export default function BranchesPage() {
       cancelled = true;
     };
   }, [resetBranchesStore, router]);
+
+  const openAccountSettings = () => {
+    setAccName(userName === "..." ? "" : userName);
+    setAccPhone(userPhone ?? "");
+    setAccRole(userRole ?? "");
+    setAccError(null);
+    setIsAccountSettingsOpen(true);
+  };
+
+  const handleAccountSave = async () => {
+    if (accSaving) return;
+
+    const phoneCanonical = getCanonicalPhone(accPhone);
+    if (accPhone.trim() && !phoneCanonical) {
+      return;
+    }
+
+    setAccError(null);
+    setAccSaving(true);
+    try {
+      const updated = await authApi.updateMe({
+        fullName: accName.trim() || null,
+        phone: phoneCanonical,
+        role: accRole.trim() || null,
+      });
+      setUserName(updated.fullName || updated.username);
+      setUserPhone(updated.phone);
+      setUserRole(updated.role);
+      setIsAccountSettingsOpen(false);
+    } catch (e) {
+      setAccError(
+        e instanceof Error ? e.message : "Не удалось сохранить изменения"
+      );
+    } finally {
+      setAccSaving(false);
+    }
+  };
 
   useEffect(() => {
     const handler = (event: MouseEvent) => {
@@ -323,6 +304,7 @@ export default function BranchesPage() {
   return (
     <AuthGuard>
       <main className="flex min-h-screen flex-col bg-[rgba(242,243,244,1)]">
+        <ImpersonationBanner />
         <div className="flex-1">
           <div className="px-8 pt-6">
             <div className="flex items-start justify-between">
@@ -373,9 +355,35 @@ export default function BranchesPage() {
                       </button>
                     </div>
 
+                    {!impersonation && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserOpen(false);
+                          openAccountSettings();
+                        }}
+                        className="mt-4 flex h-10 w-full cursor-pointer items-center gap-3 rounded-[10px] px-3 text-[14px] text-[#000000] transition hover:bg-[#F3F4F6]"
+                      >
+                        <Image
+                          src="/Icons/setup-account_logo.svg"
+                          alt="Настроить аккаунт"
+                          width={32}
+                          height={32}
+                          className="h-8 w-8"
+                        />
+                        Настроить аккаунт
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => {
+                        setUserOpen(false);
+                        // В режиме просмотра «Выйти» возвращает в админ-панель.
+                        if (impersonation) {
+                          exitImpersonation();
+                          return;
+                        }
                         authApi.logout();
                         resetBranchesStore();
                         router.replace("/login");
@@ -393,53 +401,25 @@ export default function BranchesPage() {
               Аналитика по филиалам
             </h1>
 
-            <div className="mt-4 flex items-center gap-6">
-              <div className="flex overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
-                {(["week", "30", "90", "year"] as Period[]).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={`px-5 py-2.5 text-[13px] transition-colors ${
-                      activePreset === value
-                        ? "bg-[#F3F4F6] font-medium text-[#111827]"
-                        : "text-[#9CA3AF] hover:bg-black/[0.02]"
-                    }`}
-                    onClick={() => {
-                      const next = getDateRangeByPeriod(value, new Date());
-                      setActivePreset(value);
-                      setDateFrom(toISODate(next.start));
-                      setDateTo(toISODate(next.end));
-                    }}
-                  >
-                    {value === "week"
-                      ? "Неделя"
-                      : value === "year"
-                      ? "Год"
-                      : `${value} дней`}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <DateField
-                  value={dateFrom}
-                  formatRu={formatRu}
-                  onChange={(next) => {
-                    setActivePreset(null);
-                    setDateFrom(next);
-                  }}
-                />
-                <span className="text-[13px] text-[#9CA3AF]">—</span>
-                <DateField
-                  value={dateTo}
-                  formatRu={formatRu}
-                  onChange={(next) => {
-                    setActivePreset(null);
-                    setDateTo(next);
-                  }}
-                />
-              </div>
-            </div>
+            <DateRangeControl
+              activePreset={activePreset}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              className="mt-4"
+              onPresetChange={(value, range) => {
+                setActivePreset(value);
+                setDateFrom(range.start);
+                setDateTo(range.end);
+              }}
+              onDateFromChange={(next) => {
+                setActivePreset(null);
+                setDateFrom(next);
+              }}
+              onDateToChange={(next) => {
+                setActivePreset(null);
+                setDateTo(next);
+              }}
+            />
           </div>
 
           <div className="px-8 pb-6 pt-6">
@@ -541,20 +521,112 @@ export default function BranchesPage() {
                 Все права защищены © ООО «Фидбэк»
               </span>
               <a
-                href="#"
+                href={LEGAL_LINKS.userAgreement.href}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-[#9CA3AF] underline decoration-transparent underline-offset-4 hover:decoration-[#9CA3AF]"
               >
-                Лицензия
+                {LEGAL_LINKS.userAgreement.label}
               </a>
               <a
-                href="#"
+                href={LEGAL_LINKS.cookiePolicy.href}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-[#9CA3AF] underline decoration-transparent underline-offset-4 hover:decoration-[#9CA3AF]"
               >
-                Политика конфиденциальности
+                {LEGAL_LINKS.cookiePolicy.label}
               </a>
             </div>
           </div>
         </footer>
+
+        {isAccountSettingsOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4"
+            onClick={() => setIsAccountSettingsOpen(false)}
+          >
+            <div
+              className="w-full max-w-[417px] rounded-[16px] bg-white px-[22px] pb-[18px] pt-[22px] shadow-[0_18px_45px_rgba(15,23,42,0.22)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="space-y-[17px]">
+                <div>
+                  <label className="mb-[8px] block text-[13px] font-medium text-[#111827]">
+                    Имя
+                  </label>
+                  <input
+                    type="text"
+                    value={accName}
+                    onChange={(e) => setAccName(e.target.value)}
+                    placeholder="Иванов Иван Иванович"
+                    className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF]"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-[8px] block text-[13px] font-medium text-[#111827]">
+                    Телефон
+                  </label>
+                  <PhoneInput
+                    value={accPhone}
+                    onChange={(next, meta) =>
+                      setAccPhone(meta.canonical ?? next)
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-[8px] flex items-center gap-1.5 text-[13px] font-medium text-[#111827]">
+                    Роль в команде
+                    {!userIsSuperuser && (
+                      <LockIcon className="h-3.5 w-3.5 text-[#9CA3AF]" />
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    value={accRole}
+                    onChange={(e) => setAccRole(e.target.value)}
+                    readOnly={!userIsSuperuser}
+                    disabled={!userIsSuperuser}
+                    placeholder="Например, Менеджер"
+                    className="h-[44px] w-full rounded-[9px] bg-[#F3F4F6] px-[16px] text-[13px] text-[#111827] outline-none placeholder:text-[#9CA3AF] disabled:cursor-not-allowed disabled:text-[#9CA3AF]"
+                  />
+                  {!userIsSuperuser && (
+                    <p className="mt-[6px] text-[12px] leading-snug text-[#9CA3AF]">
+                      Роль назначает администратор.
+                    </p>
+                  )}
+                </div>
+
+                {accError && (
+                  <p className="text-[13px] leading-snug text-[#DC2626]">
+                    {accError}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => void handleAccountSave()}
+                  disabled={
+                    accSaving ||
+                    (!!accPhone.trim() && !getCanonicalPhone(accPhone))
+                  }
+                  className="mt-[2px] h-[44px] w-full rounded-[9px] bg-black text-[13px] font-medium text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {accSaving ? "Сохраняем..." : "Сохранить"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAccountSettingsOpen(false)}
+                  className="block h-[28px] w-full text-center text-[13px] text-[#6B7280]"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </AuthGuard>
   );

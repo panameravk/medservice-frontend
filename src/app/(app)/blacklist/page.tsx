@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getCanonicalPhone, PhoneInput } from "../../components/PhoneInput";
 import { ApiError, blacklistApi, type BlacklistUser } from "../../lib/api";
 import { useBranchesStore } from "../../lib/branchesStore";
 
@@ -83,6 +84,9 @@ function BlacklistContent({ branchId }: { branchId: string }) {
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<EditableBlacklistFields>({});
+  const [editPhoneCanonical, setEditPhoneCanonical] = useState<string | null>(
+    null
+  );
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -132,6 +136,7 @@ function BlacklistContent({ branchId }: { branchId: string }) {
       phone: entry.phone,
       reason: entry.reason ?? "",
     });
+    setEditPhoneCanonical(getCanonicalPhone(entry.phone));
   };
 
   const handleSave = async () => {
@@ -144,7 +149,7 @@ function BlacklistContent({ branchId }: { branchId: string }) {
       const updated = await blacklistApi.update(editingId, {
         lastName: editForm.lastName?.trim(),
         firstName: editForm.firstName?.trim(),
-        phone: editForm.phone?.trim(),
+        phone: editPhoneCanonical ?? editForm.phone?.trim(),
         reason: editForm.reason?.trim() || null,
       });
 
@@ -153,6 +158,7 @@ function BlacklistContent({ branchId }: { branchId: string }) {
       );
       setEditingId(null);
       setEditForm({});
+      setEditPhoneCanonical(null);
     } catch (error) {
       if (error instanceof ApiError) {
         setSaveError(error.message);
@@ -169,11 +175,19 @@ function BlacklistContent({ branchId }: { branchId: string }) {
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditForm({});
+    setEditPhoneCanonical(null);
     setSaveError(null);
   };
 
   const handleDelete = async (id: number) => {
     setDeleteError(null);
+
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(
+        "Удалить запись из чёрного списка? Действие необратимо."
+      );
+      if (!confirmed) return;
+    }
 
     try {
       await blacklistApi.delete(id);
@@ -233,7 +247,7 @@ function BlacklistContent({ branchId }: { branchId: string }) {
               editingId === entry.id ? (
                 <div
                   key={entry.id}
-                  className="grid grid-cols-[1fr_1fr_1.6fr_2.4fr_64px] items-center gap-3 border-t border-black/5 bg-white px-6 py-3"
+                  className="grid grid-cols-[1fr_1fr_1.6fr_2.4fr_auto] items-center gap-3 border-t border-black/5 bg-white px-6 py-3"
                 >
                   <input
                     value={editForm.lastName ?? ""}
@@ -255,16 +269,19 @@ function BlacklistContent({ branchId }: { branchId: string }) {
                     }
                     className="rounded-[8px] border border-[#E5E7EB] bg-white px-2 py-1.5 text-[13px] text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#D8D8D8]"
                   />
-                  <input
-                    value={editForm.phone ?? ""}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({
-                        ...prev,
-                        phone: e.target.value,
-                      }))
-                    }
-                    className="rounded-[8px] border border-[#E5E7EB] bg-white px-2 py-1.5 text-[13px] text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#D8D8D8]"
-                  />
+                  <div>
+                    <PhoneInput
+                      value={editForm.phone ?? ""}
+                      onChange={(next, meta) => {
+                        setEditForm((prev) => ({
+                          ...prev,
+                          phone: next,
+                        }));
+                        setEditPhoneCanonical(meta.canonical);
+                      }}
+                      surfaceClassName="bg-white border-[#E5E7EB] py-1.5"
+                    />
+                  </div>
                   <div className="flex flex-col gap-1">
                     <input
                       value={editForm.reason ?? ""}
@@ -286,7 +303,7 @@ function BlacklistContent({ branchId }: { branchId: string }) {
                     <button
                       type="button"
                       onClick={handleSave}
-                      disabled={saveLoading}
+                      disabled={saveLoading || (!!editForm.phone && !editPhoneCanonical)}
                       className="whitespace-nowrap rounded-[8px] bg-[#F4C21A] px-2 py-1.5 text-[11px] font-semibold text-[#111827] transition-colors hover:bg-yellow-400 disabled:opacity-50"
                     >
                       {saveLoading ? "..." : "Сохранить"}

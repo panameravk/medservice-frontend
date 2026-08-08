@@ -1,5 +1,8 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- Branch changes intentionally reset and reload request data. */
+
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   getRequests,
@@ -79,11 +82,11 @@ const PLATFORM_META: Record<
   },
   prodoctorov: {
     label: "ПроДокторов",
-    icon: "/Icons/platforms/prodoctorov_logo.svg",
+    icon: "/Icons/platforms/prodoktorov.svg",
   },
   napopravku: {
     label: "НаПоправку",
-    icon: "/Icons/platforms/napopravku_logo.svg",
+    icon: "/Icons/platforms/napopravku.svg",
   },
 };
 
@@ -172,20 +175,20 @@ function StatusIndicator({
 }
 
 function PlatformBadge({ request }: { request: ReviewRequest }) {
-  const reviewUrl =
-    "reviewUrl" in request && typeof request.reviewUrl === "string"
-      ? request.reviewUrl
-      : "";
+  const reviewUrl = request.reviewUrl ?? "";
 
   if (request.platform === "complaint") {
-    const content = (
-      <span className="inline-flex h-[24px] items-center gap-[7px] rounded-[4px] border border-[#E7E7E7] bg-white px-[10px] text-[11px] text-[#9B9B9B]">
+    return (
+      <Link
+        href="/reviews-and-requests/intercepted-complaints"
+        title="Открыть перехваченные жалобы"
+        className="inline-flex h-[24px] items-center gap-[7px] rounded-[4px] bg-white px-[10px] text-[11px] font-medium text-[#111111] transition-colors hover:bg-[#F2F2F2]"
+      >
         <span className="text-[#FF1E1E]">⚡</span>
         <span>Жалоба</span>
-      </span>
+        <span aria-hidden>↗</span>
+      </Link>
     );
-
-    return content;
   }
 
   if (!request.platform) {
@@ -197,7 +200,28 @@ function PlatformBadge({ request }: { request: ReviewRequest }) {
     return <span className="text-[#B8B8B8]">—</span>;
   }
 
-  const content = (
+  // Отзыв опубликован и у нас есть ссылка на него в картах — явная кнопка,
+  // ведёт прямо на отзыв на площадке.
+  if (reviewUrl) {
+    return (
+      <a
+        href={reviewUrl}
+        target="_blank"
+        rel="noreferrer"
+        title={`Открыть отзыв на ${meta.label}`}
+        className="inline-flex h-[24px] items-center gap-[6px] rounded-[4px] bg-white px-[10px] text-[11px] font-medium text-[#111111] transition-colors hover:bg-[#F2F2F2]"
+      >
+        {meta.icon ? (
+          <img src={meta.icon} alt="" className="h-[14px] w-[14px] shrink-0" />
+        ) : null}
+        <span>Читать отзыв</span>
+        <span aria-hidden>↗</span>
+      </a>
+    );
+  }
+
+  // Платформа известна, но ссылки на опубликованный отзыв ещё нет.
+  return (
     <span className="inline-flex h-[24px] items-center gap-[7px] rounded-[4px] border border-[#E7E7E7] bg-white px-[10px] text-[11px] text-[#9B9B9B]">
       {meta.icon ? (
         <img src={meta.icon} alt="" className="h-[14px] w-[14px] shrink-0" />
@@ -205,16 +229,6 @@ function PlatformBadge({ request }: { request: ReviewRequest }) {
       <span>{meta.label}</span>
     </span>
   );
-
-  if (reviewUrl) {
-    return (
-      <a href={reviewUrl} target="_blank" rel="noreferrer">
-        {content}
-      </a>
-    );
-  }
-
-  return content;
 }
 
 function FilterChip({

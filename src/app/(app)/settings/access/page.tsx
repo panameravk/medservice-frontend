@@ -1,148 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ApiError,
+  authApi,
+  branchAccessApi,
+  type BranchAccessUser,
+} from "../../../lib/api";
+import { useBranchesStore } from "../../../lib/branchesStore";
+import { AdminModal } from "../../../components/admin/AdminModal";
+import {
+  getCanonicalPhone,
+  PhoneInput,
+} from "../../../components/PhoneInput";
 
-interface TeamMember {
-  id: string;
+type MemberFormPayload = {
+  id?: number;
   fullName: string;
+  username: string;
+  password: string;
   role: string;
   email: string;
   phone: string;
-}
-
-const ROLES = ["Руководитель", "Специалист", "Гость"] as const;
-const STORAGE_KEY = "team_members";
-
-type SelectOption = {
-  label: string;
-  value: string;
 };
-
-const DEFAULT_MEMBERS: TeamMember[] = [
-  {
-    id: "1",
-    fullName: "Байков Даниил Владимирович",
-    role: "Руководитель",
-    email: "primer@ya.ru",
-    phone: "+7 999 333 22 11",
-  },
-  {
-    id: "2",
-    fullName: "Михайлов Павел Павлович",
-    role: "Специалист",
-    email: "primer@ya.ru",
-    phone: "+7 999 333 22 11",
-  },
-  {
-    id: "3",
-    fullName: "Михайлов Павел Павлович",
-    role: "Гость",
-    email: "primer@ya.ru",
-    phone: "+7 999 333 22 11",
-  },
-];
-
-function loadMembers(): TeamMember[] {
-  if (typeof window === "undefined") return DEFAULT_MEMBERS;
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as TeamMember[]) : DEFAULT_MEMBERS;
-  } catch {
-    return DEFAULT_MEMBERS;
-  }
-}
-
-function saveMembers(members: TeamMember[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
-}
-
-function ChevronDown({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <path
-        d="M6 9l6 6 6-6"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function CustomSelect({
-  value,
-  options,
-  onChange,
-}: {
-  value: string;
-  options: SelectOption[];
-  onChange: (value: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-
-  const selected = options.find((item) => item.value === value) ?? options[0];
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className={[
-          "flex h-11 w-full items-center justify-between rounded-[10px]",
-          "border border-transparent bg-[#F3F4F6] px-4 text-left text-[13px] text-[#111827]",
-          "outline-none transition-colors hover:bg-[#ECEEF1]",
-          open ? "border-[#D8D8D8]" : "focus:border-[#D8D8D8]",
-        ].join(" ")}
-      >
-        <span className="truncate">{selected?.label ?? "Выберите"}</span>
-        <ChevronDown
-          className={[
-            "shrink-0 text-[#6B7280] transition-transform duration-200",
-            open ? "rotate-180" : "",
-          ].join(" ")}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-[46px] z-50 w-full overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white p-1.5 shadow-[0_16px_36px_rgba(17,24,39,0.16)]">
-          <div className="max-h-[240px] overflow-y-auto">
-            {options.map((option) => {
-              const active = option.value === value;
-
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                  className={[
-                    "flex min-h-[40px] w-full items-center rounded-[10px] px-3 text-left text-[14px] transition",
-                    active
-                      ? "bg-[#F3F4F6] font-medium text-[#222222]"
-                      : "text-[#444444] hover:bg-[#F8F8F8]",
-                  ].join(" ")}
-                >
-                  <span className="pr-2">{option.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function IconEdit() {
   return (
@@ -186,20 +66,35 @@ function MemberModal({
   onClose,
   onSave,
 }: {
-  initial: TeamMember | null;
+  initial: BranchAccessUser | null;
   onClose: () => void;
-  onSave: (member: Omit<TeamMember, "id"> & { id?: string }) => void;
+  onSave: (member: MemberFormPayload) => void;
 }) {
   const [fullName, setFullName] = useState(initial?.fullName ?? "");
-  const [role, setRole] = useState(initial?.role ?? ROLES[0]);
+  const [username, setUsername] = useState(initial?.username ?? "");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState(initial?.role ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
 
-  const roleOptions: SelectOption[] = ROLES.map((r) => ({ label: r, value: r }));
+  const isEditing = !!initial;
+  const phoneCanonical = getCanonicalPhone(phone);
+  const canSave =
+    fullName.trim() &&
+    role.trim() &&
+    email.trim() &&
+    phoneCanonical &&
+    (isEditing || (username.trim() && password.length >= 8));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-[420px] rounded-[16px] bg-white p-6 shadow-[0_18px_40px_rgba(17,24,39,0.18)] space-y-4">
+    <AdminModal
+      onClose={onClose}
+      widthClassName="max-w-[460px]"
+      title={
+        isEditing ? "Редактировать доступ" : "Создать нового пользователя"
+      }
+    >
+      <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
             ФИО
@@ -207,16 +102,50 @@ function MemberModal({
           <input
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="w-full h-11 rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
+            className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
             placeholder="Иванов Иван Иванович"
           />
         </div>
+
+        {!isEditing && (
+          <div>
+            <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
+              Логин
+            </label>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
+              placeholder="manager"
+            />
+          </div>
+        )}
+
+        {!isEditing && (
+          <div>
+            <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
+              Пароль
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
+              placeholder="Минимум 8 символов"
+            />
+          </div>
+        )}
 
         <div>
           <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
             Роль в команде
           </label>
-          <CustomSelect value={role} options={roleOptions} onChange={setRole} />
+          <input
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
+            placeholder="Руководитель"
+          />
         </div>
 
         <div>
@@ -227,21 +156,21 @@ function MemberModal({
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full h-11 rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
+            className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
             placeholder="email@example.com"
           />
+          <p className="mt-1.5 text-[11px] leading-4 text-[#9CA3AF]">
+            На этот адрес отправим ссылку, если пользователь забудет пароль.
+          </p>
         </div>
 
         <div>
           <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
             Телефон
           </label>
-          <input
-            type="tel"
+          <PhoneInput
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full h-11 rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
-            placeholder="+7 999 000 00 00"
+            onChange={(next, meta) => setPhone(meta.canonical ?? next)}
           />
         </div>
 
@@ -251,15 +180,17 @@ function MemberModal({
             onSave({
               id: initial?.id,
               fullName: fullName.trim(),
-              role,
+              username: username.trim(),
+              password,
+              role: role.trim(),
               email: email.trim(),
-              phone: phone.trim(),
+              phone: phoneCanonical ?? "",
             })
           }
-          disabled={!fullName.trim()}
+          disabled={!canSave}
           className="h-11 w-full rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90 disabled:opacity-50"
         >
-          {initial ? "Сохранить" : "Выдать доступ"}
+          {isEditing ? "Сохранить" : "Создать пользователя"}
         </button>
 
         <button
@@ -270,53 +201,244 @@ function MemberModal({
           Отмена
         </button>
       </div>
-    </div>
+    </AdminModal>
+  );
+}
+
+function GrantAccessModal({
+  onClose,
+  onGrant,
+}: {
+  onClose: () => void;
+  onGrant: (username: string) => Promise<void>;
+}) {
+  const [username, setUsername] = useState("");
+  const [granting, setGranting] = useState(false);
+  const [grantError, setGrantError] = useState<string | null>(null);
+
+  const handleGrant = async () => {
+    const normalizedUsername = username.trim();
+    if (!normalizedUsername || granting) return;
+
+    setGranting(true);
+    setGrantError(null);
+
+    try {
+      await onGrant(normalizedUsername);
+    } catch (error) {
+      setGrantError(
+        error instanceof ApiError
+          ? error.message
+          : "Не удалось выдать доступ к филиалу"
+      );
+    } finally {
+      setGranting(false);
+    }
+  };
+
+  return (
+    <AdminModal
+      onClose={onClose}
+      widthClassName="max-w-[460px]"
+      title="Выдать доступ к филиалу"
+    >
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleGrant();
+        }}
+      >
+        <p className="text-[12px] leading-[17px] text-[#6B7280]">
+          Введите логин существующего пользователя. Он получит доступ к выбранному
+          филиалу.
+        </p>
+
+        <div>
+          <label className="mb-1.5 block text-[13px] font-medium text-[#111827]">
+            Логин
+          </label>
+          <input
+            autoFocus
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            className="h-11 w-full rounded-[10px] border border-transparent bg-[#F3F4F6] px-4 text-[13px] text-[#111827] placeholder-[#9CA3AF] transition-colors focus:border-[#D8D8D8] focus:outline-none"
+            placeholder="manager"
+          />
+        </div>
+
+        {grantError && (
+          <p className="text-[13px] text-red-500">{grantError}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={!username.trim() || granting}
+          className="h-11 w-full rounded-[10px] bg-[#F4C21A] text-[13px] font-semibold text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90 disabled:opacity-50"
+        >
+          {granting ? "Выдаём доступ..." : "Выдать доступ"}
+        </button>
+
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={granting}
+          className="w-full text-center text-[13px] text-[#6B7280] transition-colors hover:text-[#111827] disabled:opacity-50"
+        >
+          Отмена
+        </button>
+      </form>
+    </AdminModal>
   );
 }
 
 export default function AccessPage() {
-  const [members, setMembers] = useState<TeamMember[]>(() => loadMembers());
+  const selectedBranchId = useBranchesStore((s) => s.selectedBranchId);
+  const branches = useBranchesStore((s) => s.branches);
+  const [members, setMembers] = useState<BranchAccessUser[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<TeamMember | null>(null);
+  const [grantModalOpen, setGrantModalOpen] = useState(false);
+  const [editing, setEditing] = useState<BranchAccessUser | null>(null);
 
-  const persist = (next: TeamMember[]) => {
-    setMembers(next);
-    saveMembers(next);
-  };
+  const tableMessage = useMemo(() => {
+    if (loading) return "Загрузка...";
+    if (members.length === 0) return "Нет участников команды";
+    return null;
+  }, [loading, members.length]);
 
-  const handleSave = (data: Omit<TeamMember, "id"> & { id?: string }) => {
-    if (data.id) {
-      persist(
-        members.map((member) =>
-          member.id === data.id ? { ...member, ...data } : member
-        )
-      );
-    } else {
-      persist([...members, { ...data, id: String(Date.now()) } as TeamMember]);
+  const firstUserId = useMemo(
+    () =>
+      branches.find((branch) => branch.id === selectedBranchId)?.firstUser?.id ??
+      members[0]?.id ??
+      null,
+    [branches, members, selectedBranchId]
+  );
+
+  useEffect(() => {
+    if (!selectedBranchId) {
+      return;
     }
 
-    setModalOpen(false);
-    setEditing(null);
+    let cancelled = false;
+
+    const loadMembers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [nextMembers, me] = await Promise.all([
+          branchAccessApi.getAll(selectedBranchId),
+          authApi.me(),
+        ]);
+
+        if (cancelled) return;
+        setMembers(nextMembers);
+        setCurrentUserId(me.id);
+      } catch (error) {
+        if (cancelled) return;
+        setMembers([]);
+        setError(
+          error instanceof ApiError
+            ? error.message
+            : "Не удалось загрузить доступы"
+        );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void loadMembers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBranchId]);
+
+  const handleSave = async (data: MemberFormPayload) => {
+    if (!selectedBranchId) return;
+
+    setError(null);
+
+    try {
+      if (data.id) {
+        const updated = await branchAccessApi.update(data.id, selectedBranchId, {
+          fullName: data.fullName,
+          role: data.role,
+          email: data.email,
+          phone: data.phone,
+        });
+        setMembers((prev) =>
+          prev.map((member) => (member.id === data.id ? updated : member))
+        );
+      } else {
+        const created = await branchAccessApi.create(selectedBranchId, {
+          fullName: data.fullName,
+          username: data.username,
+          password: data.password,
+          role: data.role,
+          email: data.email,
+          phone: data.phone,
+        });
+        setMembers((prev) => [...prev, created]);
+      }
+
+      setModalOpen(false);
+      setEditing(null);
+    } catch (error) {
+      setError(
+        error instanceof ApiError ? error.message : "Не удалось сохранить доступ"
+      );
+    }
   };
 
-  const handleDelete = (id: string) => {
-    persist(members.filter((member) => member.id !== id));
+  const handleRevoke = async (member: BranchAccessUser) => {
+    if (!selectedBranchId || member.id === currentUserId) return;
+
+    const name = member.fullName || member.username;
+    const confirmed = window.confirm(`Отозвать доступ к филиалу у «${name}»?`);
+    if (!confirmed) return;
+
+    setError(null);
+
+    try {
+      await branchAccessApi.revoke(member.id, selectedBranchId);
+      setMembers((prev) => prev.filter((item) => item.id !== member.id));
+    } catch (error) {
+      setError(
+        error instanceof ApiError ? error.message : "Не удалось отозвать доступ"
+      );
+    }
   };
 
-  const openEdit = (member: TeamMember) => {
-    setEditing(member);
-    setModalOpen(true);
+  const handleGrant = async (username: string) => {
+    if (!selectedBranchId) return;
+
+    const granted = await branchAccessApi.grant(selectedBranchId, username);
+    setMembers((prev) =>
+      prev.some((member) => member.id === granted.id)
+        ? prev
+        : [...prev, granted]
+    );
+    setGrantModalOpen(false);
   };
 
-  const openCreate = () => {
-    setEditing(null);
-    setModalOpen(true);
-  };
+  if (!selectedBranchId) {
+    return <p className="text-[14px] text-[#9CA3AF]">Выберите филиал</p>;
+  }
 
   return (
     <div className="space-y-5 p-6">
+      {error && (
+        <div className="rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
+          {error}
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white">
-        <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr_64px] border-b border-[#E5E7EB] px-6 py-3 text-[13px] font-medium text-[#6B7280]">
+        <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_80px] border-b border-[#E5E7EB] px-6 py-3 text-[13px] font-medium text-[#6B7280]">
           <span>ФИО</span>
           <span>Роль в команде</span>
           <span>Email</span>
@@ -324,60 +446,94 @@ export default function AccessPage() {
           <span />
         </div>
 
-        {members.length === 0 ? (
+        {tableMessage ? (
           <div className="px-6 py-8 text-[13px] text-[#9CA3AF]">
-            Нет участников команды
+            {tableMessage}
           </div>
         ) : (
           <div className="divide-y divide-[#F3F4F6]">
-            {members.map((member) => (
-              <div
-                key={member.id}
-                className="grid grid-cols-[1.6fr_1fr_1fr_1fr_64px] items-center px-6 py-4 transition-colors hover:bg-[#FAFAFA]"
-              >
-                <span className="text-[13px] text-[#111827]">
-                  {member.fullName}
-                </span>
-                <span className="text-[13px] text-[#6B7280]">
-                  {member.role}
-                </span>
-                <span className="text-[13px] text-[#6B7280]">
-                  {member.email}
-                </span>
-                <span className="text-[13px] text-[#6B7280]">
-                  {member.phone}
-                </span>
-                <div className="flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(member)}
-                    className="text-[#9CA3AF] transition-colors hover:text-[#111827]"
-                    title="Редактировать"
-                  >
-                    <IconEdit />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(member.id)}
-                    className="text-[#9CA3AF] transition-colors hover:text-red-500"
-                    title="Удалить"
-                  >
-                    <IconTrash />
-                  </button>
+            {members.map((member) => {
+              const isCurrentUser = member.id === currentUserId;
+              const isFirstUser = member.id === firstUserId;
+
+              return (
+                <div
+                  key={member.id}
+                  className="grid grid-cols-[1.5fr_1fr_1fr_1fr_80px] items-center px-6 py-4 transition-colors hover:bg-[#FAFAFA]"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] text-[#111827]">
+                      {member.fullName || "—"}
+                    </div>
+                    <div className="truncate text-[12px] text-[#9CA3AF]">
+                      @{member.username}
+                    </div>
+                  </div>
+                  <span className="truncate text-[13px] text-[#6B7280]">
+                    {member.role || "—"}
+                  </span>
+                  <span className="truncate text-[13px] text-[#6B7280]">
+                    {member.email}
+                  </span>
+                  <span className="truncate text-[13px] text-[#6B7280]">
+                    {member.phone || "—"}
+                  </span>
+                  <div className="flex items-center justify-end gap-3">
+                    {!isFirstUser && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditing(member);
+                            setModalOpen(true);
+                          }}
+                          disabled={isCurrentUser}
+                          className="text-[#9CA3AF] transition-colors hover:text-[#111827] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-[#9CA3AF]"
+                          title="Редактировать"
+                        >
+                          <IconEdit />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleRevoke(member);
+                          }}
+                          disabled={isCurrentUser}
+                          className="text-[#9CA3AF] transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-[#9CA3AF]"
+                          title="Отозвать доступ"
+                        >
+                          <IconTrash />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={openCreate}
-        className="h-12 rounded-[10px] bg-[#F4C21A] px-8 text-[13px] font-medium text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90"
-      >
-        Выдать доступ к филиалу
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setEditing(null);
+            setModalOpen(true);
+          }}
+          className="h-12 rounded-[10px] bg-[#F4C21A] px-8 text-[13px] font-medium text-[#111827] transition-colors hover:bg-yellow-300 active:brightness-90"
+        >
+          Создать нового пользователя
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setGrantModalOpen(true)}
+          className="h-12 rounded-[10px] bg-[#111827] px-8 text-[13px] font-medium text-white transition-colors hover:bg-[#1F2937] active:brightness-90"
+        >
+          Выдать доступ
+        </button>
+      </div>
 
       {modalOpen && (
         <MemberModal
@@ -386,7 +542,16 @@ export default function AccessPage() {
             setModalOpen(false);
             setEditing(null);
           }}
-          onSave={handleSave}
+          onSave={(payload) => {
+            void handleSave(payload);
+          }}
+        />
+      )}
+
+      {grantModalOpen && (
+        <GrantAccessModal
+          onClose={() => setGrantModalOpen(false)}
+          onGrant={handleGrant}
         />
       )}
     </div>

@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- The editable form mirrors the currently selected branch. */
+
 import { useEffect, useState } from "react";
 import { updateBranch } from "../../../lib/api";
 import { useBranchesStore } from "../../../lib/branchesStore";
